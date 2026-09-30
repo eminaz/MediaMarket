@@ -227,3 +227,50 @@ test('headless agent also advances and downloads a single-server order', async (
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('seller directory compares all sellers, their aggregated ratings and style prices on desktop and mobile', async ({
+  page,
+  request,
+}) => {
+  const styles = await (await request.get('/api/styles')).json();
+  const expectedSellers = new Set(styles.map((style: { sellerId: string }) => style.sellerId));
+  await page.goto('/');
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await navigation.getByRole('link', { name: 'Sellers', exact: true }).click();
+  await expect(page).toHaveURL(/\/sellers$/);
+  await expect(page.getByRole('heading', { name: 'Sellers.', exact: true })).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'Sellers', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(navigation.getByRole('link', { name: 'Seller studio' })).not.toHaveClass(/active/);
+  await expect(page.locator('.seller-directory tbody tr')).toHaveCount(expectedSellers.size);
+  const aure = page.locator('[data-seller="studio.aure"]');
+  await expect(aure).toContainText('2 styles');
+  await expect(aure.locator('.directory-price')).toHaveText('2.00–2.50');
+  const seller = styles.find(
+    (style: { sellerId: string }) => style.sellerId === 'studio.aure',
+  ).seller;
+  await expect(aure.locator('.rating-summary')).toHaveText(
+    seller.reviewCount
+      ? `${seller.averageRating.toFixed(1)} stars · ${seller.reviewCount} ${seller.reviewCount === 1 ? 'review' : 'reviews'}`
+      : 'No reviews yet',
+  );
+  await expect(aure.getByRole('link')).toHaveCount(2);
+  await expect(page.locator('[data-seller="offgrid"] .rating-summary')).toHaveText(
+    'No reviews yet',
+  );
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: 'test-results/sellers-desktop.png', fullPage: true });
+  for (const width of [820, 390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await expect(navigation.getByRole('link', { name: 'Sellers', exact: true })).toBeVisible();
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/sellers-mobile.png', fullPage: true });
+  await aure.getByRole('link', { name: /Luxury Product Ad/ }).click();
+  await expect(page).toHaveURL(/\/styles\/luxury-product-ad$/);
+});

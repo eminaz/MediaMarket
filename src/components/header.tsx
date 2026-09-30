@@ -16,7 +16,14 @@ export function Header() {
           <Link className={path.startsWith('/jobs') ? 'active' : ''} href="/jobs">
             My creations
           </Link>
-          <Link className={path.startsWith('/sell') ? 'active' : ''} href="/sell">
+          <Link
+            className={path === '/sellers' ? 'active' : ''}
+            aria-current={path === '/sellers' ? 'page' : undefined}
+            href="/sellers"
+          >
+            Sellers
+          </Link>
+          <Link className={path === '/sell' ? 'active' : ''} href="/sell">
             Seller studio <ArrowUpRight size={12} />
           </Link>
         </nav>

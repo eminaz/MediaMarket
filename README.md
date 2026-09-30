@@ -42,6 +42,8 @@ Saved creations appear in **My creations**, including pending payments and inter
 
 ## Ratings and reviews
 
+Open **Sellers** in the navigation, or `/sellers`, to compare every listed seller's overall rating, review count, USDC price range, and individual style prices. Each style links to its detail page. The directory includes sellers who are not configured for ordering; worker mode labels these as browse-only. Ordering eligibility does not imply the seller is currently online.
+
 Reviews come only from **delivered orders**: one immutable review per order, integer 1–5 stars, and optional text up to 280 characters. Identical retries return the original review; an attempt to change it returns 409. The unique order constraint and write transaction prevent concurrent submissions from double-counting. No ratings are seeded or fabricated. A fresh style has `averageRating: null` and `reviewCount: 0`.
 
 Marketplace cards, style details, and the buyer's style selection show raw average ratings and review counts. Style details also show the seller's aggregate across every reviewed order for all of their styles, and the latest 20 reviews. Seller averages are weighted by orders, not by averaging each style's average.
