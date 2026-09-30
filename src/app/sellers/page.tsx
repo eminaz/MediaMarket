@@ -84,6 +84,12 @@ export default function SellersPage() {
                   </th>
                   <td data-label="Overall rating">
                     <Rating {...seller} />
+                    <Link
+                      className="text-link directory-reviews-link"
+                      href={`/sellers/${seller.id}`}
+                    >
+                      View reviews <ArrowUpRight size={14} aria-hidden="true" />
+                    </Link>
                   </td>
                   <td data-label="Price per image">
                     <div className="directory-price">

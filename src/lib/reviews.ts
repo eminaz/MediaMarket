@@ -28,6 +28,24 @@ export function getStyleReviews(styleId: string): Review[] {
     .all(styleId) as Omit<Review, 'source'>[];
   return rows.map((row) => ({ ...row, source: 'completed-order' }));
 }
+export const SELLER_REVIEWS_PAGE_SIZE = 20;
+export function getSellerReviews(sellerId: string, page = 1) {
+  const rows = db()
+    .prepare(
+      `SELECT reviews.id, reviews.stars, reviews.text, reviews.createdAt,
+        styles.id AS styleId, json_extract(styles.data, '$.name') AS styleName
+      FROM reviews
+      JOIN jobs ON jobs.id = reviews.jobId
+      JOIN styles ON styles.id = jobs.styleListingId
+      WHERE styles.sellerId = ? AND json_extract(jobs.data, '$.status') = 'delivered'
+      ORDER BY reviews.createdAt DESC, reviews.rowid DESC LIMIT ? OFFSET ?`,
+    )
+    .all(sellerId, SELLER_REVIEWS_PAGE_SIZE, (page - 1) * SELLER_REVIEWS_PAGE_SIZE) as (Omit<
+    Review,
+    'source'
+  > & { styleId: string; styleName: string })[];
+  return rows.map((row) => ({ ...row, source: 'completed-order' as const }));
+}
 export function submitReview(jobId: string, values: unknown) {
   const input = reviewSchema.parse(values);
   const conn = db();

@@ -10,7 +10,8 @@ process.env.EXECUTION_MODE = 'local';
 process.env.PAYMENT_MODE = 'simulated';
 const { db, getStyle, getStyles, saveJob } = await import('../src/lib/db');
 const { createJob } = await import('../src/lib/jobs');
-const { getStyleReviews, getOrderReview, submitReview } = await import('../src/lib/reviews');
+const { getStyleReviews, getSellerReviews, getOrderReview, submitReview } =
+  await import('../src/lib/reviews');
 const { POST, GET } = await import('../src/app/api/jobs/[id]/review/route');
 const { GET: discover } = await import('../src/app/api/agent/styles/route');
 const { agentOrderView } = await import('../src/lib/agent-orders');
@@ -112,4 +113,46 @@ test('style and seller aggregates are order-weighted and exposed to buyer agents
   assert.equal(JSON.stringify(style).includes('hiddenWorkflowPrompt'), false);
   assert.equal(getStyleReviews('luxury-product-ad').length, 2);
   assert.equal('jobId' in getStyleReviews('luxury-product-ad')[0], false);
+});
+
+test('seller reviews combine styles, exclude other sellers and paginate without exposing orders', () => {
+  const expected = [];
+  for (let i = 0; i < 22; i++) {
+    const styleId = i % 2 ? 'botanical-editorial' : 'luxury-product-ad';
+    const { review } = submitReview(order(styleId).id, { stars: 4, text: `Seller feedback ${i}` });
+    // Equal timestamps exercise the stable insertion-order tie break.
+    db()
+      .prepare('UPDATE reviews SET createdAt = ? WHERE id = ?')
+      .run('2099-01-01T00:00:00.000Z', review.id);
+    expected.unshift(review.id);
+  }
+  const other = submitReview(order('meme-launch-graphic').id, {
+    stars: 2,
+    text: 'Other seller',
+  }).review;
+  const noLongerDelivered = order();
+  const excluded = submitReview(noLongerDelivered.id, { stars: 1 }).review;
+  saveJob({ ...noLongerDelivered, status: 'failed' });
+  const first = getSellerReviews('studio.aure');
+  const second = getSellerReviews('studio.aure', 2);
+  assert.equal(first.length, 20);
+  assert.deepEqual(
+    [...first, ...second].slice(0, 22).map((review) => review.id),
+    expected,
+  );
+  assert.deepEqual(
+    new Set(first.map((review) => review.styleName)),
+    new Set(['Luxury Product Ad', 'Botanical Editorial']),
+  );
+  assert.equal(
+    new Set([...first, ...second].map((review) => review.id)).size,
+    first.length + second.length,
+  );
+  for (const review of [...first, ...second]) {
+    assert.notEqual(review.id, other.id);
+    assert.notEqual(review.id, excluded.id);
+    assert.equal('jobId' in review, false);
+    assert.equal('hiddenWorkflowPrompt' in review, false);
+  }
+  assert.deepEqual(getSellerReviews('missing-seller'), []);
 });

@@ -17,7 +17,7 @@ export function Header() {
             My creations
           </Link>
           <Link
-            className={path === '/sellers' ? 'active' : ''}
+            className={path === '/sellers' || path.startsWith('/sellers/') ? 'active' : ''}
             aria-current={path === '/sellers' ? 'page' : undefined}
             href="/sellers"
           >

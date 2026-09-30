@@ -59,6 +59,9 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
           <div className="detail-ratings">
             <Rating {...style} label="Style" />
             <Rating {...style.seller} label="Seller" />
+            <Link className="text-link" href={`/sellers/${style.sellerId}`}>
+              All seller reviews <ArrowRight size={14} aria-hidden="true" />
+            </Link>
           </div>
           <Tags tags={style.tags} />
           <div className="detail-quote">

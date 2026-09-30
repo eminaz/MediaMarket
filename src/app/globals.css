@@ -4004,6 +4004,30 @@ button {
   background: #fff;
   min-width: 0;
 }
+.directory-reviews-link {
+  margin-top: 12px;
+}
+.seller-reviews-page {
+  max-width: 1000px;
+  padding-bottom: 65px;
+}
+.seller-reviews-page h1,
+.seller-reviews-page .text-link {
+  overflow-wrap: anywhere;
+}
+.seller-reviews-identity,
+.seller-review-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.seller-review-pagination {
+  margin-top: 24px;
+}
+.seller-reviews-page .review-card .text-link {
+  font-size: 13px;
+}
 .payment-proof-title {
   display: flex;
   align-items: center;

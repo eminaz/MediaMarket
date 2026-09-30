@@ -256,7 +256,7 @@ test('seller directory compares all sellers, their aggregated ratings and style 
       ? `${seller.averageRating.toFixed(1)} stars · ${seller.reviewCount} ${seller.reviewCount === 1 ? 'review' : 'reviews'}`
       : 'No reviews yet',
   );
-  await expect(aure.getByRole('link')).toHaveCount(2);
+  await expect(aure.locator('.directory-styles').getByRole('link')).toHaveCount(2);
   await expect(page.locator('[data-seller="offgrid"] .rating-summary')).toHaveText(
     'No reviews yet',
   );
@@ -273,4 +273,69 @@ test('seller directory compares all sellers, their aggregated ratings and style 
   await page.screenshot({ path: 'test-results/sellers-mobile.png', fullPage: true });
   await aure.getByRole('link', { name: /Luxury Product Ad/ }).click();
   await expect(page).toHaveURL(/\/styles\/luxury-product-ad$/);
+});
+
+test('seller reviews combine comments across styles and link back to each listing', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  const feedback = [
+    { styleListingId: 'luxury-product-ad', text: 'Combined view: elegant lighting.', stars: 5 },
+    {
+      styleListingId: 'botanical-editorial',
+      text: 'Combined view: lovely botanical colors.',
+      stars: 4,
+    },
+  ];
+  for (const { styleListingId, text, stars } of feedback) {
+    const response = await request.post('/api/jobs', {
+      data: { styleListingId, buyerBrief: 'A refined skincare campaign', budget: 5 },
+    });
+    expect(response.status()).toBe(201);
+    const job = await response.json();
+    await expect
+      .poll(async () => (await request.post(`/api/jobs/${job.id}/pay`)).status())
+      .toBe(200);
+    await page.goto(`/jobs/${job.id}`);
+    await expect(page.getByRole('heading', { name: 'Now that’s an impression.' })).toBeVisible({
+      timeout: 30_000,
+    });
+    expect(
+      (await request.post(`/api/jobs/${job.id}/review`, { data: { stars, text } })).status(),
+    ).toBe(201);
+  }
+  await page.goto('/sellers');
+  await page
+    .locator('[data-seller="studio.aure"]')
+    .getByRole('link', { name: 'View reviews' })
+    .click();
+  await expect(page).toHaveURL(/\/sellers\/studio.aure$/);
+  const reviews = page.getByRole('region', { name: 'Seller reviews', exact: true });
+  for (const { text, stars } of feedback) {
+    const card = reviews.locator('article').filter({ hasText: text });
+    await expect(card).toBeVisible();
+    await expect(card.getByLabel(`${stars} out of 5 stars`)).toBeVisible();
+  }
+  await expect(reviews.locator('article').first()).toContainText(feedback[1].text);
+  await page.screenshot({ path: 'test-results/seller-reviews-desktop.png', fullPage: true });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
+  await page.screenshot({ path: 'test-results/seller-reviews-mobile.png', fullPage: true });
+  await reviews
+    .locator('article')
+    .filter({ hasText: feedback[1].text })
+    .getByRole('link', { name: 'Botanical Editorial' })
+    .click();
+  await page.getByRole('link', { name: 'All seller reviews' }).click();
+  await expect(page).toHaveURL(/\/sellers\/studio.aure$/);
+  await page.goto('/sellers/offgrid');
+  await expect(page.getByRole('heading', { name: 'No reviews yet.' })).toBeVisible();
+  await page.goto('/sellers/missing-seller');
+  // Next.js streamed responses can keep HTTP 200 while rendering notFound().
+  await expect(page.getByRole('heading', { name: 'A little off the canvas.' })).toBeVisible();
 });
