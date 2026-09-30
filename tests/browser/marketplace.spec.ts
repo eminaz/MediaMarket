@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 const require = createRequire(import.meta.url);
 test('marketplace filters, detail, text brief, agent selection, payment and delivery', async ({
   page,
+  request,
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -47,8 +48,31 @@ test('marketplace filters, detail, text brief, agent selection, payment and deli
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download image' }).click();
   expect((await downloadPromise).suggestedFilename()).toBe('tastemaker-creation.png');
+  await page.getByRole('radio', { name: '5 stars', exact: true }).check();
+  await page.getByLabel('A short review').fill('Beautiful lighting and a polished composition.');
+  await page.getByRole('button', { name: 'Submit review', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your review', exact: true })).toBeVisible();
+  await expect(
+    page.getByText('Beautiful lighting and a polished composition.', { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Submit review', exact: true })).toHaveCount(0);
+  const id = page.url().split('/').pop();
+  expect((await request.post(`/api/jobs/${id}/review`, { data: { stars: 1 } })).status()).toBe(409);
+  const discovery = await (await request.get('/api/agent/styles?tags=luxury')).json();
+  expect(discovery.styles[0].averageRating).toBe(5);
+  expect(discovery.styles[0].reviewCount).toBe(1);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await page.screenshot({ path: 'test-results/delivered-desktop.png', fullPage: true });
+  await page.goto('/styles/luxury-product-ad');
+  await expect(
+    page.getByText('Beautiful lighting and a polished composition.', { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.detail-ratings')).toContainText('5.0 stars · 1 review');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
   expect(errors).toEqual([]);
 });
 
@@ -84,6 +108,7 @@ test('manual selection and saved pending order recover without duplicate payment
   ).json();
   expect((await request.post(`/api/jobs/${pending.id}/advance`)).status()).toBe(409);
   await page.goto(`/jobs/${pending.id}`);
+  await expect(page.getByRole('radio', { name: '5 stars', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Pay 2.50 demo USDC' }).click();
   await expect(page.getByText('In the studio', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Now that’s an impression.' })).toBeVisible({

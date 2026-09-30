@@ -3,7 +3,14 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { seeds, seedPayoutAddresses } from './seed';
 import { defaultPayoutAddress, payoutOverrides, requirePayoutAddress } from './payout';
-import type { GenerationJob, PrivateStyleListing, Seller, StyleListing } from './types';
+import { unrated } from './ratings';
+import type {
+  GenerationJob,
+  PrivateStyleListing,
+  Seller,
+  StyleListing,
+  RatingSummary,
+} from './types';
 
 export const dataDir = process.env.DATA_DIR
   ? path.resolve(/* turbopackIgnore: true */ process.env.DATA_DIR)
@@ -21,12 +28,20 @@ export function db() {
     CREATE TABLE IF NOT EXISTS agent_requests (requestKey TEXT PRIMARY KEY, requestHash TEXT NOT NULL, jobId TEXT NOT NULL REFERENCES jobs(id));
     CREATE TABLE IF NOT EXISTS payment_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS payment_locks (jobId TEXT PRIMARY KEY REFERENCES jobs(id), token TEXT NOT NULL, expiresAt INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS reviews (
+      id TEXT PRIMARY KEY,
+      jobId TEXT UNIQUE NOT NULL REFERENCES jobs(id),
+      stars INTEGER NOT NULL CHECK(typeof(stars) = 'integer' AND stars BETWEEN 1 AND 5),
+      text TEXT NOT NULL CHECK(length(text) <= 280),
+      createdAt TEXT NOT NULL
+    );
   `);
   const now = new Date().toISOString();
   database.exec('BEGIN IMMEDIATE');
   try {
     for (const seed of seeds) {
       const seller: Seller = {
+        ...unrated,
         id: seed.handle,
         handle: seed.handle,
         displayName: seed.displayName,
@@ -40,6 +55,7 @@ export function db() {
         .prepare('INSERT OR IGNORE INTO sellers VALUES (?, ?, ?)')
         .run(seller.id, seller.handle, JSON.stringify(seller));
       const style: PrivateStyleListing = {
+        ...unrated,
         id: seed.id,
         sellerId: seller.id,
         seller,
@@ -98,14 +114,54 @@ export function publicStyle(style: PrivateStyleListing): StyleListing {
   void hiddenWorkflowPrompt;
   return safe;
 }
+// Derive summaries from individual completed-order reviews. Seller averages are weighted by
+// the number of orders across all styles, not an average of style averages.
+function ratingSummaries() {
+  const rows = db()
+    .prepare(
+      `
+    SELECT jobs.styleListingId AS styleId, styles.sellerId,
+      COUNT(*) AS count, SUM(reviews.stars) AS total
+    FROM reviews JOIN jobs ON jobs.id = reviews.jobId JOIN styles ON styles.id = jobs.styleListingId
+    WHERE json_extract(jobs.data, '$.status') = 'delivered'
+    GROUP BY jobs.styleListingId, styles.sellerId
+  `,
+    )
+    .all() as { styleId: string; sellerId: string; count: number; total: number }[];
+  const styles = new Map<string, RatingSummary>();
+  const sellers = new Map<string, { count: number; total: number }>();
+  for (const row of rows) {
+    styles.set(row.styleId, { averageRating: row.total / row.count, reviewCount: row.count });
+    const previous = sellers.get(row.sellerId) || { count: 0, total: 0 };
+    sellers.set(row.sellerId, {
+      count: previous.count + row.count,
+      total: previous.total + row.total,
+    });
+  }
+  return (style: PrivateStyleListing): PrivateStyleListing => {
+    const seller = sellers.get(style.sellerId);
+    return {
+      ...style,
+      ...(styles.get(style.id) || unrated),
+      seller: {
+        ...style.seller,
+        averageRating: seller ? seller.total / seller.count : null,
+        reviewCount: seller?.count || 0,
+      },
+    };
+  };
+}
 export function getStyles() {
+  const withRatings = ratingSummaries();
   return (
     db()
       .prepare(
         'SELECT styles.data, sellers.data AS sellerData FROM styles JOIN sellers ON sellers.id = styles.sellerId ORDER BY styles.rowid',
       )
       .all() as { data: string; sellerData: string }[]
-  ).map((row) => publicStyle({ ...JSON.parse(row.data), seller: JSON.parse(row.sellerData) }));
+  ).map((row) =>
+    publicStyle(withRatings({ ...JSON.parse(row.data), seller: JSON.parse(row.sellerData) })),
+  );
 }
 export function getPrivateStyle(id: string): PrivateStyleListing | null {
   const row = db().prepare('SELECT data FROM styles WHERE id = ?').get(id) as
@@ -115,7 +171,7 @@ export function getPrivateStyle(id: string): PrivateStyleListing | null {
   const seller = db().prepare('SELECT data FROM sellers WHERE id = ?').get(style.sellerId) as {
     data: string;
   };
-  return { ...style, seller: JSON.parse(seller.data) };
+  return ratingSummaries()({ ...style, seller: JSON.parse(seller.data) });
 }
 export function getStyle(id: string) {
   const style = getPrivateStyle(id);

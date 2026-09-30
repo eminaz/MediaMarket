@@ -1,6 +1,18 @@
-import { ArrowUpRight, Clock3, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Clock3, Sparkles, Star } from 'lucide-react';
 import Link from 'next/link';
-import type { StyleListing } from '@/lib/types';
+import type { StyleListing, RatingSummary } from '@/lib/types';
+
+export function Rating({ averageRating, reviewCount, label }: RatingSummary & { label?: string }) {
+  return (
+    <span className="rating-summary">
+      <Star size={13} aria-hidden="true" />
+      {label && <span>{label}: </span>}
+      {reviewCount > 0 && averageRating !== null
+        ? `${averageRating.toFixed(1)} stars · ${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'}`
+        : 'No reviews yet'}
+    </span>
+  );
+}
 
 export function Logo({ small = false }: { small?: boolean }) {
   return (
@@ -129,6 +141,7 @@ export function StyleCard({ style }: { style: StyleListing }) {
           <span className="verified">✳</span>
         </div>
         <Tags tags={style.tags} />
+        <Rating {...style} />
         <div className="card-bottom">
           <Usdc amount={style.priceUsdc} />
           <span className="eta">

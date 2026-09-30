@@ -1,5 +1,13 @@
 export type MediaType = 'image' | 'video';
-export type Seller = {
+export type RatingSummary = { averageRating: number | null; reviewCount: number };
+export type Review = {
+  id: string;
+  stars: number;
+  text: string;
+  createdAt: string;
+  source: 'completed-order';
+};
+export type Seller = RatingSummary & {
   id: string;
   handle: string;
   displayName: string;
@@ -23,7 +31,7 @@ export type PaymentEvidence = {
   sellerDelta: string;
   verifiedAt: string;
 };
-export type StyleListing = {
+export type StyleListing = RatingSummary & {
   id: string;
   sellerId: string;
   seller: Seller;
@@ -79,4 +87,4 @@ export type GenerationJob = {
   createdAt: string;
   updatedAt: string;
 };
-export type JobWithStyle = GenerationJob & { style: StyleListing };
+export type JobWithStyle = GenerationJob & { style: StyleListing; review?: Review | null };

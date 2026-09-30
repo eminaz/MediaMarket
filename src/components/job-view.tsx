@@ -18,6 +18,7 @@ import { api } from '@/lib/client';
 import { Avatar, StyleArtwork, Tags, Usdc } from './ui';
 import { PaymentProof } from './payment-proof';
 import { paymentReady } from '@/lib/payment-mode';
+import { OrderReview } from './order-review';
 export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
   const [job, setJob] = useState(initialJob);
   const [error, setError] = useState('');
@@ -319,6 +320,13 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
             </div>
           </div>
           <PaymentProof job={job} />
+          {done && (
+            <OrderReview
+              jobId={job.id}
+              initialReview={job.review || null}
+              onReviewed={async () => setJob(await api<JobWithStyle>(`/api/jobs/${job.id}`))}
+            />
+          )}
           <div className="job-brief">
             <h3>Your starting point</h3>
             {job.inputImageUrl && (

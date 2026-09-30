@@ -36,8 +36,27 @@ npm start
 7. Watch **queued → generating → delivered**. Local mock delivery takes roughly 7–10 seconds; listing ETAs represent the intended creative service and live API latency varies.
 8. Compare the brief, selected style, and output. Download the PNG or create another image.
 9. Visit **Seller studio** to publish a new style, upload 1–3 examples, choose pricing and a fallback palette, and enter a private workflow prompt.
+10. On a delivered order, choose 1–5 stars and optionally write a short review. Submit once; the style and seller ratings update for the next buyer.
 
 Saved creations appear in **My creations**, including pending payments and interrupted work. Reloading a job resumes progress; failed jobs can be retried without another payment.
+
+## Ratings and reviews
+
+Reviews come only from **delivered orders**: one immutable review per order, integer 1–5 stars, and optional text up to 280 characters. Identical retries return the original review; an attempt to change it returns 409. The unique order constraint and write transaction prevent concurrent submissions from double-counting. No ratings are seeded or fabricated. A fresh style has `averageRating: null` and `reviewCount: 0`.
+
+Marketplace cards, style details, and the buyer's style selection show raw average ratings and review counts. Style details also show the seller's aggregate across every reviewed order for all of their styles, and the latest 20 reviews. Seller averages are weighted by orders, not by averaging each style's average.
+
+The built-in picker first excludes styles over budget, then sorts by tag overlap, then a rating score that tempers small samples, then ETA and price:
+
+```text
+ratingScore = (averageRating * reviewCount + 3 * 10) / (reviewCount + 10)
+```
+
+The 3-star, 10-observation prior is only ranking math; it is never stored as reviews or displayed as a rating. An unrated style has a neutral score of 3. For equally matching styles within budget, 4.8 stars from 30 reviews scores 4.35; 5.0 from one review scores about 3.18. External agents receive the unadjusted `averageRating` and `reviewCount` on both the style and `seller`, so they can make their own judgment.
+
+`POST /api/jobs/{jobId}/review` accepts `{ "stars": 5, "text": "Beautiful light." }` after delivery. `GET` on the same URL returns the saved review or null. `GET /api/styles/{styleId}/reviews` returns the latest 20 public reviews and aggregate values. Agent order status exposes `review` and an available `reviewUrl`; agents should only submit feedback supplied by their user, never invent a rating.
+
+This retains the MVP's shared, unauthenticated orders: reviews are tied to completed orders, **not authenticated buyer identities**. Anyone who knows an order URL can submit its first review. Simulated-payment and mock-image orders can also be reviewed once delivered. Production ownership and abuse prevention remain future work.
 
 ## A buyer’s agent can order directly
 
@@ -282,7 +301,9 @@ src/components/          Marketplace, creation flow, seller form, job status UI
 src/lib/types.ts         Seller, StyleListing, GenerationJob, MediaType
 src/lib/db.ts            SQLite tables, idempotent seed, public projections
 src/lib/seed.ts          Six signature style listings
-src/lib/agent.ts         Budget filter → exact tag matches → lowest ETA → price
+src/lib/agent.ts         Budget filter → tag matches → review-adjusted rating → ETA → price
+src/lib/reviews.ts       Delivered-order reviews, idempotent submission, public review lists
+src/lib/ratings.ts       Neutral prior for ranking small review samples
 src/lib/agent-orders.ts  Agent ordering, keyword tags, idempotency, public delivery metadata
 src/lib/jobs.ts          Shared web and agent order validation
 src/lib/generation.ts    ImageProvider interface, mock and OpenAI providers

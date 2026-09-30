@@ -6,6 +6,12 @@ const imageUrl = z
     /^\/api\/media\/[a-f0-9-]+\.png$|^\/samples\/(luxury|street|pastel|cinema|meme|organic)\.jpg$/,
   );
 export const tagsSchema = z.array(z.string().trim().min(1).max(30)).max(12);
+export const reviewSchema = z
+  .object({
+    stars: z.number().int().min(1).max(5),
+    text: z.string().trim().max(280, 'Keep your review to 280 characters.').default(''),
+  })
+  .strict();
 export const jobSchema = z.object({
   styleListingId: z.string().min(1),
   inputImageUrl: z.string().nullable().optional().default(null),

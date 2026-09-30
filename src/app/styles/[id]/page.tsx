@@ -11,12 +11,15 @@ import {
 } from 'lucide-react';
 import { getStyle, getStyles } from '@/lib/db';
 import { executionMode, sellerHasWorker } from '@/lib/workers';
-import { Avatar, StyleArtwork, StyleCard, Tags, Usdc } from '@/components/ui';
+import { Avatar, StyleArtwork, StyleCard, Tags, Usdc, Rating } from '@/components/ui';
+import { getStyleReviews } from '@/lib/reviews';
+import { paymentMode } from '@/lib/payment-mode';
 export const dynamic = 'force-dynamic';
 export default async function StylePage({ params }: { params: Promise<{ id: string }> }) {
   const style = getStyle((await params).id);
   if (!style) notFound();
   const available = executionMode() === 'local' || sellerHasWorker(style.seller.handle);
+  const reviews = getStyleReviews(style.id);
   return (
     <div className="page-wrap">
       <Link className="back-link" href="/#styles">
@@ -53,6 +56,10 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
             <span className="verified">✳</span>
           </div>
           <p className="detail-description">{style.description}</p>
+          <div className="detail-ratings">
+            <Rating {...style} label="Style" />
+            <Rating {...style.seller} label="Seller" />
+          </div>
           <Tags tags={style.tags} />
           <div className="detail-quote">
             “{style.publicPromptSummary || 'A signature perspective for your next idea.'}”
@@ -80,7 +87,9 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
           </Link>
           <p className="checkout-note">
             <ShieldCheck size={13} />
-            Simulated USDC checkout · No wallet required
+            {paymentMode() === 'pay-sandbox'
+              ? 'Pay.sh sandbox checkout · Test USDC'
+              : 'Simulated USDC checkout · No wallet required'}
           </p>
           <div className="requirements">
             <h3>
@@ -105,6 +114,36 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
+      <section className="style-reviews" aria-label="Style reviews">
+        <div className="section-heading">
+          <h2>From completed orders.</h2>
+          <Rating {...style} />
+        </div>
+        {reviews.length ? (
+          <div className="review-list">
+            {reviews.map((review) => (
+              <article className="review-card" key={review.id}>
+                <p className="review-stars" aria-label={`${review.stars} out of 5 stars`}>
+                  {'★'.repeat(review.stars)}
+                  {'☆'.repeat(5 - review.stars)}
+                </p>
+                {review.text && <p className="review-text">{review.text}</p>}
+                <p className="mode-note">
+                  Completed order ·{' '}
+                  <time dateTime={review.createdAt}>{review.createdAt.slice(0, 10)}</time>
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mode-note">
+            No reviews yet. Reviews appear after a delivered order is rated.
+          </p>
+        )}
+        {style.reviewCount > reviews.length && (
+          <p className="mode-note">Showing the latest {reviews.length} reviews.</p>
+        )}
+      </section>
       <div className="related-section">
         <div className="section-heading">
           <h2>Another way to see it.</h2>

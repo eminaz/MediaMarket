@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/client';
 import type { GenerationJob, StyleListing } from '@/lib/types';
-import { Avatar, StyleArtwork, Tags, Usdc } from './ui';
+import { Avatar, StyleArtwork, Tags, Usdc, Rating } from './ui';
 
 const vibes = [
   'luxury',
@@ -237,7 +237,7 @@ export function CreateFlow({
                 {busy ? <LoaderCircle className="spin" size={23} /> : <WandSparkles size={23} />}
                 <span>
                   <strong>Auto-pick for me</strong>
-                  <span>Your vibe + your budget + the fastest match.</span>
+                  <span>Your vibe + your budget + ratings that consider review count.</span>
                 </span>
                 <ArrowRight size={19} />
               </button>
@@ -281,6 +281,7 @@ export function CreateFlow({
                         @{s.seller.handle} · ~{s.etaSeconds}s
                       </span>
                       <span>{s.tags.join(' · ')}</span>
+                      <Rating {...s} />
                     </span>
                     <span className="option-price">
                       {s.priceUsdc.toFixed(2)}

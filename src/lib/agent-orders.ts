@@ -6,6 +6,7 @@ import { createJob, orderableStyles } from './jobs';
 import { jobSchema, tagsSchema } from './validation';
 import { paymentMode, jobPaymentMode, paymentReady } from './payment-mode';
 import type { GenerationJob, StyleListing } from './types';
+import { getOrderReview } from './reviews';
 
 export const agentOrderSchema = z.object({
   prompt: jobSchema.shape.buyerBrief,
@@ -112,7 +113,10 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
 }
 
 export function agentOrderView(job: GenerationJob) {
+  const review = getOrderReview(job.id);
   return {
+    review,
+    reviewUrl: job.status === 'delivered' && !review ? `/api/jobs/${job.id}/review` : null,
     jobId: job.id,
     status: job.status,
     payment: {

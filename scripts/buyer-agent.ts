@@ -125,6 +125,10 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
     `${job.style?.name} by @${job.style?.seller.handle} · ${job.payment.amountUsdc.toFixed(2)} ${job.payment.mode} USDC`,
   );
   console.error(job.decisionReason);
+  if (job.style?.reviewCount && job.style.averageRating !== null)
+    console.error(
+      `Style rating: ${job.style.averageRating.toFixed(1)} stars · ${job.style.reviewCount} reviews`,
+    );
   console.error(`View: ${resolveUrl(job.viewUrl)}`);
   if (job.paymentUrl) {
     if (job.payment.mode !== 'pay-sandbox' || !job.paymentUrl)
@@ -227,6 +231,7 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
         paymentMode: job.payment.mode,
         paymentReceipt: job.payment.receipt,
         generationMode: job.generationMode,
+        reviewUrl: job.reviewUrl ? resolveUrl(job.reviewUrl) : null,
       },
       null,
       2,
