@@ -7,6 +7,9 @@ node_modules/
 next-env.d.ts
 *.tsbuildinfo
 
+# Local-only engineering documentation
+/docs/
+
 # Local configuration and credentials
 .env*
 !.env.example
