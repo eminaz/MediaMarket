@@ -45,13 +45,27 @@ The marketplace can hand orders to a **separate seller worker over HTTP**. The w
 
 ### Quick demo on one laptop
 
-Stop any app already using port 3001, then run:
+No environment setup is needed. Run these from the project folder in two terminals:
+
+```sh
+# Terminal 1 — buyer marketplace at http://localhost:3001
+npm run buyer
+```
+
+```sh
+# Terminal 2 — seller dashboard at http://localhost:4001
+npm run seller
+```
+
+The seller handle, matching demo token, ports, and mock generation mode have built-in defaults. `npm run buyer` always starts the mock worker-mode marketplace; it reads optional overrides from `.env.local`. `npm run seller` reads optional overrides from `.env.worker`. No copying files or entering credentials is required for the local demo.
+
+Or start both processes with one command:
 
 ```sh
 npm run demo:distributed
 ```
 
-This starts two independent processes with a fresh in-memory seller token:
+The combined launcher starts two independent processes with a fresh in-memory seller token:
 
 - **Buyer marketplace:** http://localhost:3001
 - **Seller machine dashboard:** http://localhost:4001
@@ -72,39 +86,27 @@ Pausing stops new claims; an already claimed job finishes. The worker keeps poll
 
 Both machines need this repository, Node.js 22.13+, and `npm install`. No shared disk is needed.
 
-**Marketplace laptop:** create `.env.local` with:
-
-```dotenv
-GENERATION_MODE=mock
-EXECUTION_MODE=worker
-SELLER_WORKER_TOKENS='{"studio.aure":"paste-a-random-secret-here"}'
-```
-
-Generate a random token with `node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"` and put the same value in both configurations. Each seller should have a distinct token of at least 16 characters. Then start:
+**Buyer laptop:**
 
 ```sh
-npm run dev -- --hostname 0.0.0.0 --port 3001
+npm run buyer
 ```
 
-**Seller laptop:** copy `.env.worker.example` to `.env.worker`, then set:
+**Seller laptop:** create `.env.worker` with just the buyer laptop’s address:
 
 ```dotenv
 MARKETPLACE_URL=http://MARKETPLACE_LAN_IP:3001
-SELLER_HANDLE=studio.aure
-SELLER_WORKER_TOKEN=paste-the-same-random-secret-here
-WORKER_NAME=Aure studio MacBook
-WORKER_PORT=4001
 ```
 
 ```sh
-npm run worker
+npm run seller
 ```
 
 Open **http://localhost:4001 on the seller laptop**. The dashboard binds to loopback; only the marketplace needs to be reachable across the network. Both machines must be able to reach the marketplace LAN address and port; permit that port through the marketplace machine’s firewall if needed. Use HTTPS when crossing an untrusted network, since seller credentials are bearer tokens.
 
-The worker automatically loads `.env.worker`, while Next.js loads `.env.local`. Neither file is committed. PNGs are saved in the worker’s ignored `worker-data/` folder. Optional worker settings: `WORKER_OUTPUT_DIR` changes that folder; `WORKER_DEMO_DELAY_MS` controls the visible composition delay (default 6000 ms, maximum 120000 ms).
+All other values match automatically using the shared demo defaults. `.env.worker.example` lists optional overrides. `npm run worker` remains an alias for the seller process. `.env.worker` and `.env.local` are ignored by Git. PNGs are saved in the worker’s ignored `worker-data/` folder. Optional worker settings: `WORKER_OUTPUT_DIR` changes that folder; `WORKER_DEMO_DELAY_MS` controls the visible composition delay (default 6000 ms, maximum 120000 ms).
 
-To add another seller, add its handle/token pair to `SELLER_WORKER_TOKENS` and run a worker with that seller’s credentials. Restart the marketplace after changing its environment. Newly created seller handles must be configured before their styles can accept worker-mode orders. Worker names are display labels, not hardware identity attestations.
+For custom seller credentials, set `SELLER_WORKER_TOKENS` (a JSON handle/token map) in the buyer’s `.env.local`, and matching `SELLER_HANDLE` and `SELLER_WORKER_TOKEN` in the seller’s `.env.worker`. Custom tokens must have at least 16 characters. Restart both processes after changing their environment. Newly created seller handles must be configured before their styles can accept worker-mode orders. The built-in credential is public demo data; worker names are display labels, not hardware identity attestations.
 
 ### Handoff and recovery
 

@@ -44,8 +44,8 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
       env: {
         ...process.env,
         MARKETPLACE_URL: 'http://127.0.0.1:3102',
-        SELLER_HANDLE: 'studio.aure',
-        SELLER_WORKER_TOKEN: 'integration-worker-token-1234',
+        SELLER_HANDLE: '',
+        SELLER_WORKER_TOKEN: '',
         WORKER_NAME: 'Independent seller laptop',
         WORKER_PORT: '4102',
         WORKER_DEMO_DELAY_MS: '2500',

@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "seed": "tsx scripts/seed.ts",
+    "buyer": "tsx scripts/buyer.ts",
+    "seller": "tsx scripts/seller-worker.ts",
     "worker": "tsx scripts/seller-worker.ts",
     "demo:distributed": "tsx scripts/distributed-demo.ts",
     "typecheck": "tsc --noEmit",

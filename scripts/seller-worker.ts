@@ -4,6 +4,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { renderMockImage } from '../src/lib/mock-image';
 import type { WorkerAssignment } from '../src/lib/workers';
+import { demoSeller, demoToken } from './demo-defaults';
 
 // Worker settings are separate from the marketplace's .env.local.
 try {
@@ -12,8 +13,8 @@ try {
   if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
 }
 const marketplace = new URL(process.env.MARKETPLACE_URL || 'http://localhost:3001').origin;
-const seller = process.env.SELLER_HANDLE || 'studio.aure';
-const token = process.env.SELLER_WORKER_TOKEN || '';
+const seller = process.env.SELLER_HANDLE || demoSeller;
+const token = process.env.SELLER_WORKER_TOKEN || demoToken;
 const workerName = process.env.WORKER_NAME || `${seller} / ${hostname()}`;
 const port = Number(process.env.WORKER_PORT || 4001);
 const outputDir = path.resolve(process.env.WORKER_OUTPUT_DIR || 'worker-data');
