@@ -1,3 +1,5 @@
+// Optional seller-level seed overrides. Existing installations can use SELLER_PAYOUT_ADDRESSES.
+export const seedPayoutAddresses: Record<string, string> = {};
 export const seeds = [
   {
     id: 'luxury-product-ad',

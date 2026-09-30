@@ -5,6 +5,23 @@ export type Seller = {
   displayName: string;
   bio: string;
   avatarUrl: string;
+  payoutAddress: string;
+};
+export type PaymentEvidence = {
+  network: 'pay-sandbox';
+  signature: string;
+  mint: string;
+  slot: number;
+  buyerAddress: string;
+  sellerAddress: string;
+  amountUsdc: string;
+  buyerBalanceBefore: string;
+  buyerBalanceAfter: string;
+  buyerDelta: string;
+  sellerBalanceBefore: string;
+  sellerBalanceAfter: string;
+  sellerDelta: string;
+  verifiedAt: string;
 };
 export type StyleListing = {
   id: string;
@@ -39,6 +56,8 @@ export type GenerationJob = {
   decisionReason: string;
   paymentStatus: 'pending' | 'confirmed';
   paymentMode?: 'simulated' | 'pay-sandbox';
+  payoutAddress?: string;
+  paymentVerificationError?: string | null;
   paymentReceipt?: {
     protocol: 'mpp';
     network: 'pay-sandbox';
@@ -47,6 +66,7 @@ export type GenerationJob = {
     recipient: string;
     amountUsdc: number;
     confirmedAt: string;
+    evidence?: PaymentEvidence;
   };
   paymentConfirmedAt: string | null;
   priceUsdc: number;

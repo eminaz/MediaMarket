@@ -46,7 +46,7 @@ test('pay.sh sandbox settles test USDC before a seller can deliver', async ({ re
         MARKETPLACE_URL: 'http://127.0.0.1:3102',
         SELLER_HANDLE: '',
         SELLER_WORKER_TOKEN: '',
-        SELLER_GENERATOR: 'mock',
+        SELLER_GENERATOR: process.env.TEST_LOCAL_GENERATOR === '1' ? 'local' : 'mock',
         WORKER_NAME: 'Pay sandbox seller',
         WORKER_PORT: '4102',
         WORKER_DEMO_DELAY_MS: '100',
@@ -57,6 +57,18 @@ test('pay.sh sandbox settles test USDC before a seller can deliver', async ({ re
   worker.stdout.on('data', () => {});
   worker.stderr.on('data', () => {});
   try {
+    // A running worker cannot claim the unpaid order.
+    await expect
+      .poll(async () => {
+        try {
+          return (await request.get('http://127.0.0.1:4102')).status();
+        } catch {
+          return 0;
+        }
+      })
+      .toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect((await (await request.get(job.statusUrl)).json()).status).toBe('queued');
     const { stdout, stderr } = await promisify(execFile)(
       process.execPath,
       [
@@ -98,21 +110,74 @@ test('pay.sh sandbox settles test USDC before a seller can deliver', async ({ re
           instruction.parsed.info.tokenAmount?.amount === '2500000',
       ),
     ).toBe(true);
-    expect(stderr).toContain('Pay sandbox confirmed');
+    const evidence = delivered.paymentReceipt.evidence;
+    expect(evidence.signature).toBe(delivered.paymentReceipt.transaction);
+    expect(evidence.sellerAddress).toBe(job.style.seller.payoutAddress);
+    expect(evidence.buyerDelta).toBe('-2.500000');
+    expect(evidence.sellerDelta).toBe('2.500000');
+    const balances = (
+      entries: Array<{ mint: string; owner: string; uiTokenAmount: { amount: string } }>,
+      owner: string,
+    ) =>
+      entries
+        .filter((entry) => entry.mint === evidence.mint && entry.owner === owner)
+        .reduce((sum, entry) => sum + BigInt(entry.uiTokenAmount.amount), 0n);
+    const decimal = (units: bigint) =>
+      `${units / 1000000n}.${(units % 1000000n).toString().padStart(6, '0')}`;
+    expect(evidence.buyerBalanceBefore).toBe(
+      decimal(balances(chain.result.meta.preTokenBalances, evidence.buyerAddress)),
+    );
+    expect(evidence.buyerBalanceAfter).toBe(
+      decimal(balances(chain.result.meta.postTokenBalances, evidence.buyerAddress)),
+    );
+    expect(evidence.sellerBalanceBefore).toBe(
+      decimal(balances(chain.result.meta.preTokenBalances, evidence.sellerAddress)),
+    );
+    expect(evidence.sellerBalanceAfter).toBe(
+      decimal(balances(chain.result.meta.postTokenBalances, evidence.sellerAddress)),
+    );
+    expect(stderr).toContain('Payment verified.');
+    expect(stderr).toContain('Paid 2.50 test USDC');
     expect(await readFile(delivered.imagePath)).toEqual(
       await (await request.get(delivered.imageUrl)).body(),
     );
     const repeated = await (await request.post(job.paymentUrl)).json();
     expect(repeated.paymentReceipt.transaction).toBe(delivered.paymentReceipt.transaction);
+    expect(Date.parse(repeated.workerClaimedAt)).toBeGreaterThanOrEqual(
+      Date.parse(evidence.verifiedAt),
+    );
+    expect(repeated.generationMode).toBe(
+      process.env.TEST_LOCAL_GENERATOR === '1' ? 'local' : 'mock',
+    );
+    const repeatedAgain = await (await request.post(job.paymentUrl)).json();
+    expect(repeatedAgain).toEqual(repeated);
     const replayed = await (await request.post('/api/agent/orders', options)).json();
     expect(replayed.jobId).toBe(job.jobId);
     expect(replayed.payment.receipt.transaction).toBe(delivered.paymentReceipt.transaction);
-    await expect(page.getByText('Pay.sh sandbox receipt', { exact: true })).toBeVisible({
+    await expect(page.getByText('Payment settled', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText('Sandbox paid', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('payment-buyer')).toContainText('-2.50 USDC');
+    await expect(page.getByTestId('payment-seller')).toContainText('+2.50 USDC');
+    await page.getByText('Transaction & full addresses').click();
     await page.screenshot({ path: 'test-results/pay-sandbox-delivery.png', fullPage: true });
-    console.log(`Verified pay.sh sandbox transaction: ${delivered.paymentReceipt.transaction}`);
+    console.log(
+      JSON.stringify(
+        {
+          ...evidence,
+          generationMode: repeated.generationMode,
+          workerClaimedAt: repeated.workerClaimedAt,
+          outputImageUrl: repeated.outputImageUrl,
+        },
+        null,
+        2,
+      ),
+    );
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
   } finally {
     worker.kill('SIGTERM');
     if (worker.exitCode === null) await once(worker, 'exit');

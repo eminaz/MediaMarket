@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { getStyles, publicStyle, saveStyle } from '@/lib/db';
 import { apiError, listingSchema } from '@/lib/validation';
+import { defaultPayoutAddress, payoutOverrides } from '@/lib/payout';
 export const runtime = 'nodejs';
 export async function GET() {
   return Response.json(getStyles());
 }
 export async function POST(request: Request) {
   try {
-    const values = listingSchema.parse(await request.json());
+    const { payoutAddress, ...values } = listingSchema.parse(await request.json());
     const id = randomUUID();
     const seller = {
       id: randomUUID(),
@@ -15,6 +16,8 @@ export async function POST(request: Request) {
       displayName: values.handle,
       bio: 'Independent creative seller on Tastemaker.',
       avatarUrl: '',
+      payoutAddress:
+        payoutOverrides()[values.handle] || payoutAddress || defaultPayoutAddress(values.handle),
     };
     const style = {
       ...values,
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       featured: false,
     };
-    saveStyle(style);
+    saveStyle(style, payoutOverrides()[values.handle] || payoutAddress);
     return Response.json(publicStyle(style), { status: 201 });
   } catch (error) {
     return apiError(error);

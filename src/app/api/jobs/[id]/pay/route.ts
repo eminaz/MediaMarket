@@ -1,10 +1,10 @@
 import { getJob, saveJob } from '@/lib/db';
-import { jobPaymentMode } from '@/lib/payment-mode';
+import { jobPaymentMode, paymentReady } from '@/lib/payment-mode';
 export const maxDuration = 180;
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const job = getJob((await params).id);
   if (!job) return Response.json({ error: 'Job not found.' }, { status: 404 });
-  if (job.paymentStatus === 'confirmed') return Response.json(job);
+  if (paymentReady(job)) return Response.json(job);
   if (jobPaymentMode(job) === 'pay-sandbox') {
     try {
       const { paySandboxOrder } = await import('@/lib/pay-sandbox');

@@ -1,8 +1,10 @@
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { createPayKit, Gate, Signer } from '@solana/pay-kit';
 import { usd } from '@solana/pay-kit';
 import { db, getJob, getStyle, saveJob } from './db';
-import { PAY_SANDBOX_RPC } from './payment-mode';
+import { PAY_SANDBOX_RPC, paymentReady } from './payment-mode';
+import { USDC_MINT } from './payment-evidence';
+import { verifySavedPayment } from './payment-verification';
 import type { GenerationJob } from './types';
 
 // This module deliberately has no mainnet or custom-RPC configuration path.
@@ -31,12 +33,6 @@ function operator() {
     throw error;
   });
   return operatorReady;
-}
-export async function sandboxRecipient(handle: string) {
-  // Public demo keys derived per seller; test tokens only, never mainnet wallets.
-  return (
-    await Signer.bytes(createHash('sha256').update(`tastemaker-sandbox-seller:${handle}`).digest())
-  ).pubkey;
 }
 function challengeSecret(jobId: string) {
   const conn = db();
@@ -75,10 +71,10 @@ function kitFor(job: GenerationJob) {
   let pending = kits.get(job.id);
   if (!pending) {
     pending = (async () => {
-      const recipient = await sandboxRecipient(getStyle(job.styleListingId)!.seller.handle);
+      const recipient = job.payoutAddress!;
       // Fee-sponsored MPP expects the recipient's token account to exist.
       // Bootstrap only missing sandbox accounts; never reset an existing balance.
-      const mint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+      const mint = USDC_MINT;
       const accounts = await rpc('getTokenAccountsByOwner', [
         recipient,
         { mint },
@@ -124,38 +120,45 @@ function kitFor(job: GenerationJob) {
   return pending;
 }
 export async function paySandboxOrder(request: Request, job: GenerationJob) {
-  if (job.paymentStatus === 'confirmed') return Response.json(job);
-  // Only proof-bearing calls need serialization. Unpaid calls can get challenges freely.
-  const proof = request.headers.get('authorization')?.toLowerCase().startsWith('payment ');
+  if (paymentReady(job)) return Response.json(job);
+  // Serialize both settlement and receipt-only verification retries.
   const token = randomUUID();
-  if (proof) {
-    const result = db()
-      .prepare(
-        'INSERT INTO payment_locks VALUES (?, ?, ?) ON CONFLICT(jobId) DO UPDATE SET token=excluded.token, expiresAt=excluded.expiresAt WHERE expiresAt < ?',
-      )
-      .run(job.id, token, Date.now() + 180_000, Date.now());
-    if (!result.changes)
-      return Response.json(
-        {
-          error:
-            'Payment verification is already in progress. Poll the saved order before retrying.',
-        },
-        { status: 409, headers: { 'Retry-After': '2' } },
-      );
-  }
+  const lock = db()
+    .prepare(
+      'INSERT INTO payment_locks VALUES (?, ?, ?) ON CONFLICT(jobId) DO UPDATE SET token=excluded.token, expiresAt=excluded.expiresAt WHERE expiresAt < ?',
+    )
+    .run(job.id, token, Date.now() + 180_000, Date.now());
+  if (!lock.changes)
+    return Response.json(
+      {
+        error: 'Payment verification is already in progress. Poll the saved order before retrying.',
+      },
+      { status: 409, headers: { 'Retry-After': '2' } },
+    );
   try {
-    const current = getJob(job.id)!;
-    if (current.paymentStatus === 'confirmed') return Response.json(current);
+    let current = getJob(job.id)!;
+    if (paymentReady(current)) return Response.json(current);
+    if (!current.payoutAddress) {
+      // Preserve a legacy accepted receipt's recipient; snapshot pending orders before advertising.
+      current = saveJob({
+        ...current,
+        payoutAddress:
+          current.paymentReceipt?.recipient ||
+          getStyle(current.styleListingId)!.seller.payoutAddress,
+      });
+    }
+    if (current.paymentReceipt)
+      return Response.json(await verifySavedPayment(job.id, fetchSettlement));
     const { kit, gate, recipient } = await kitFor(current);
     const result = await kit.requirePayment(request, gate);
     if ('respond' in result) return result.respond;
     if (result.status === 402) return result.response;
     if (!result.payment.transaction) throw new Error('Pay returned no settlement transaction.');
     const now = new Date().toISOString();
-    const paid = saveJob({
+    saveJob({
       ...getJob(job.id)!,
-      paymentStatus: 'confirmed',
-      paymentConfirmedAt: now,
+      paymentStatus: 'pending',
+      paymentConfirmedAt: null,
       updatedAt: now,
       paymentReceipt: {
         protocol: 'mpp',
@@ -167,9 +170,27 @@ export async function paySandboxOrder(request: Request, job: GenerationJob) {
         confirmedAt: now,
       },
     });
+    const paid = await verifySavedPayment(job.id, fetchSettlement);
     return result.withSettlement(Response.json(paid));
   } finally {
-    if (proof)
-      db().prepare('DELETE FROM payment_locks WHERE jobId = ? AND token = ?').run(job.id, token);
+    db().prepare('DELETE FROM payment_locks WHERE jobId = ? AND token = ?').run(job.id, token);
   }
+}
+
+async function fetchSettlement(signature: string) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const transaction = await rpc('getTransaction', [
+      signature,
+      {
+        encoding: 'jsonParsed',
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+      },
+    ]);
+    if (transaction) return transaction;
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(
+    'Settlement is not available from the sandbox RPC yet. Retry verification of this saved order.',
+  );
 }

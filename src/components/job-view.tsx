@@ -16,6 +16,8 @@ import {
 import type { JobWithStyle } from '@/lib/types';
 import { api } from '@/lib/client';
 import { Avatar, StyleArtwork, Tags, Usdc } from './ui';
+import { PaymentProof } from './payment-proof';
+import { paymentReady } from '@/lib/payment-mode';
 export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
   const [job, setJob] = useState(initialJob);
   const [error, setError] = useState('');
@@ -35,7 +37,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
         setError('');
         if (
           latest.executionMode !== 'worker' &&
-          latest.paymentStatus === 'confirmed' &&
+          paymentReady(latest) &&
           !advancing.current &&
           !['delivered', 'failed'].includes(latest.status)
         ) {
@@ -72,7 +74,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
     setPaying(true);
     try {
       setError('');
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (!sandbox) await new Promise((resolve) => setTimeout(resolve, 1500));
       await api(`/api/jobs/${job.id}/pay`, {});
       setJob(await api(`/api/jobs/${job.id}`));
     } catch (e) {
@@ -110,7 +112,9 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
           {done
             ? 'Delivered'
             : job.paymentStatus === 'pending'
-              ? 'Awaiting payment'
+              ? job.paymentReceipt
+                ? 'Verifying payment'
+                : 'Awaiting payment'
               : job.status === 'failed'
                 ? 'Needs a retry'
                 : 'In the studio'}
@@ -202,7 +206,9 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                 {job.error ||
                   (job.paymentStatus === 'pending'
                     ? sandbox
-                      ? 'Pay with your local pay.sh agent or terminal. Test USDC settles on the Pay sandbox before your seller starts.'
+                      ? job.paymentReceipt
+                        ? 'Your settlement receipt is saved. Chain verification must pass before generation starts.'
+                        : 'Pay with your local pay.sh agent or terminal. Test USDC settles on the Pay sandbox before your seller starts.'
                       : 'Confirm the simulated payment to start your creation.'
                     : 'Bringing your brief and your creator’s signature style together.')}
               </p>
@@ -212,7 +218,19 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                   Retry generation
                 </button>
               )}
-              {job.paymentStatus === 'pending' && sandbox && (
+              {!paymentReady(job) && sandbox && job.paymentReceipt && (
+                <div>
+                  <p>Settlement receipt saved. Generation waits for chain verification.</p>
+                  {job.paymentVerificationError && (
+                    <p className="error-message">{job.paymentVerificationError}</p>
+                  )}
+                  <button className="button button-dark" onClick={pay} disabled={paying}>
+                    {paying ? 'Verifying transaction…' : 'Retry chain verification'}
+                  </button>
+                  <p className="mode-note">Rechecks the existing transaction. No second payment.</p>
+                </div>
+              )}
+              {job.paymentStatus === 'pending' && sandbox && !job.paymentReceipt && (
                 <div>
                   <button
                     className="button button-dark"
@@ -300,6 +318,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
               </div>
             </div>
           </div>
+          <PaymentProof job={job} />
           <div className="job-brief">
             <h3>Your starting point</h3>
             {job.inputImageUrl && (
@@ -319,10 +338,13 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                 {sandbox ? 'pay.sh sandbox checkout' : 'simulated USDC checkout'}
               </p>
             )}
-            {job.paymentReceipt && (
+            {job.paymentReceipt && !job.paymentReceipt.evidence && (
               <div className="mode-note" style={{ overflowWrap: 'anywhere' }}>
                 <strong>Pay.sh sandbox receipt</strong>
-                <p>{job.paymentReceipt.amountUsdc.toFixed(2)} test USDC · MPP · confirmed</p>
+                <p>
+                  {job.paymentReceipt.amountUsdc.toFixed(2)} test USDC · MPP · balance evidence
+                  pending
+                </p>
                 <p>
                   Transaction: <code>{job.paymentReceipt.transaction}</code>
                 </p>

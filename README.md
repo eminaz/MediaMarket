@@ -149,7 +149,7 @@ On this laptop, `npm run seller` automatically finds:
 
 It runs your existing Flux.2 Klein / MLX setup with `--steps 4 --seed 42 --width 768 --height 768`. Keep the T7 drive mounted, since your script stores its model cache there. The worker overrides `--output` with a unique temporary PNG path, removes prompt metadata, saves the finished image under `worker-data/`, and uploads it. The private recipe and buyer brief are passed together as a literal `--prompt` argument, without a shell. The worker processes one job at a time, renews its lease during generation, and stops a model process on shutdown or timeout (default three minutes).
 
-To participate: publish a style under `studio.aure` in **Seller studio**, set its price and private art direction, then leave `npm run seller` running while accepting orders. Buyers can choose any of that seller’s listings. No one needs to manually run `generate.sh` per order. If your laptop is asleep, disconnected, or the worker is stopped, orders wait. For continuous availability, run the worker and model on an always-on machine. In Pay sandbox mode, each seller handle receives test USDC at a deterministic demo wallet; its address appears on the order receipt. These public demo wallets are not production payout wallets and the tokens have no monetary value.
+To participate: publish a style under `studio.aure` in **Seller studio**, set its price and private art direction, then leave `npm run seller` running while accepting orders. Buyers can choose any of that seller’s listings. No one needs to manually run `generate.sh` per order. If your laptop is asleep, disconnected, or the worker is stopped, orders wait. For continuous availability, run the worker and model on an always-on machine. In Pay sandbox mode, each seller has a shared `payoutAddress` for all its styles. Seller studio accepts an optional wallet address; leaving it blank keeps the existing address, or uses a deterministic public demo wallet for a new seller. Test tokens have no monetary value.
 
 An optional `.env.worker` can change the script or defaults (see `.env.worker.example`). `SELLER_GENERATOR=local` requires a working script; `SELLER_GENERATOR=mock npm run seller` forces the demo compositor. Auto mode falls back only when no script is installed. A script that fails—for example because T7 is unmounted—marks the job failed for retry and **never silently substitutes a mock**. The dashboard and delivered job clearly label the renderer.
 
@@ -212,7 +212,21 @@ For browser checkout, click **Continue to pay.sh**, then **Copy pay.sh payment c
 pay --sandbox curl -X POST http://localhost:3001/api/jobs/JOB_ID/pay
 ```
 
-The browser observes payment and generation automatically. The server returns 402 until the proof verifies, then saves the transaction signature, seller test-wallet address, and exact listing price on the order. It binds challenges to individual orders, retains replay records in SQLite, and serializes payment verification. Already-paid orders return their receipt without a second charge. After a lost payment response, inspect the saved order before retrying. Failures remain unpaid; there is no fallback that pretends the transaction succeeded. A process crash after settlement but before saving the job can require reconciliation from the chain receipt; this is still a hackathon MVP.
+The browser observes payment and generation automatically. After the SDK accepts settlement, the server first saves that receipt, then fetches the **exact transaction** via `getTransaction` at confirmed commitment. It checks the signature, successful execution, order memo, USDC mint/precision, buyer signature and transfer instruction, and the seller's exact net credit. Verification uses integer token amounts from `preTokenBalances` and `postTokenBalances`; there are no before/after live balance queries. A missing balance entry for a newly created token account means zero; missing transaction metadata fails verification. The fee payer is not assumed to be the buyer.
+
+Only after this check does `paymentStatus` become `confirmed`, allowing seller claims or local generation. The order persists `paymentReceipt.evidence`: network, signature, mint, slot, buyer/seller addresses, exact decimal-string pre/post balances and deltas, and `verifiedAt`. The UI and CLI display those values. Balances refer to the participating USDC token accounts grouped by owner, not all accounts in a wallet or its current balance. Hosted sandbox funding and resets can change starting balances; nothing assumes a 5.00 buyer or 0.00 seller balance.
+
+Challenges are bound to individual orders, replay records persist in SQLite, and payment verification is serialized. Already-verified orders reuse their receipt without a second charge or generation. If chain verification fails after settlement, the order keeps the accepted receipt and blocks generation. **Retry chain verification**, the payment endpoint, or `npm run agent -- --job JOB_ID` rechecks that same signature without asking Pay to pay again. After a lost payment response, inspect the saved order before retrying. A process crash in the narrow interval between SDK settlement and saving the accepted receipt can still require reconciliation; this remains a hackathon MVP.
+
+### Seller payout configuration
+
+Set an address in **Seller studio**, or add a handle/address map to the buyer's ignored `.env.local`:
+
+```dotenv
+SELLER_PAYOUT_ADDRESSES={"studio.aure":"YOUR_SOLANA_WALLET_ADDRESS"}
+```
+
+Restart the buyer to apply configuration overrides. For a fresh database, seed defaults can also be supplied in `seedPayoutAddresses` in `src/lib/seed.ts`. Config overrides take precedence and persist to the seller record; removing an override leaves the saved address intact. Changing a seller's address updates all its style listings. Each order snapshots its payout address when created, so existing orders keep the recipient they were quoted. No private key is requested. Fallback wallets remain the same public deterministic test addresses as before. All payments still use hosted sandbox, even when the address belongs to a wallet you control.
 
 Existing orders retain their original payment mode. Restart `npm run buyer` after this update to enable sandbox for new orders; the seller process uses the same generation flow. For a completely offline demo use `PAYMENT_MODE=simulated npm run buyer`, or `npm run dev` (single-server mock default). `PAYMENT_MODE` may also be saved in `.env.local`.
 
@@ -221,9 +235,11 @@ The dependency is pinned to **pay-kit 0.12.0**. `npm install` applies a narrow c
 ```sh
 # Opt-in integration check: installed pay CLI + hosted sandbox, one 2.50 test-USDC payment
 TEST_PAY_SANDBOX=1 npm run test:worker
+# Also use your installed local image model instead of the test compositor:
+TEST_PAY_SANDBOX=1 TEST_LOCAL_GENERATOR=1 npm run test:worker
 ```
 
-This checks the 402 challenge, rejects an invalid proof, uses Pay to settle the order, checks the exact transfer amount on the sandbox chain, verifies seller delivery and the buyer’s downloaded PNG, and verifies that retries return the same receipt. No mainnet funds are used. Normal tests force simulated checkout and do not contact the payment network.
+This checks the 402 challenge, rejects an invalid proof, uses Pay to settle the order, independently compares stored evidence with the sandbox transaction metadata, verifies that the worker starts after `verifiedAt`, verifies seller delivery and the buyer's downloaded PNG, and checks receipt reuse and mobile layout. It prints the transaction signature, full addresses, actual pre/post balances, verification time and worker start time. No mainnet funds are used. Normal tests use fixtures or simulated checkout and do not contact the payment network.
 
 ## Environment variables
 
@@ -232,6 +248,7 @@ No `.env` file is required. To configure live generation, copy `.env.example` to
 | Variable             | Default           | Purpose                                                                                                                                                                          |
 | -------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PAYMENT_MODE`       | `pay-sandbox` in buyer/distributed launchers; otherwise `simulated` | Real Pay sandbox test-USDC checkout or offline simulated payment. No mainnet mode. |
+| `SELLER_PAYOUT_ADDRESSES` | `{}` | Optional JSON seller-handle/Solana-address map. Overrides seller payout addresses for new orders. |
 | `GENERATION_MODE`    | `auto` when unset | `mock` always uses the local compositor; `auto` uses OpenAI when a key is present; `openai` explicitly requires the key. The example file selects `mock` for a predictable demo. |
 | `OPENAI_API_KEY`     | empty             | Server-side key for optional OpenAI image generation. Never exposed to the browser.                                                                                              |
 | `OPENAI_IMAGE_MODEL` | `gpt-image-1`     | Image model used by the OpenAI provider.                                                                                                                                         |

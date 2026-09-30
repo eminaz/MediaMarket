@@ -9,3 +9,17 @@ export function paymentMode(): 'simulated' | 'pay-sandbox' {
 export function jobPaymentMode(job: GenerationJob) {
   return job.paymentMode || 'simulated';
 }
+export function paymentReady(job: GenerationJob) {
+  const evidence = job.paymentReceipt?.evidence;
+  return (
+    job.paymentStatus === 'confirmed' &&
+    (jobPaymentMode(job) !== 'pay-sandbox' ||
+      Boolean(
+        evidence?.verifiedAt &&
+        evidence.signature === job.paymentReceipt?.transaction &&
+        evidence.sellerAddress === job.payoutAddress &&
+        evidence.sellerAddress === job.paymentReceipt?.recipient &&
+        Number(evidence.amountUsdc) === job.priceUsdc,
+      ))
+  );
+}

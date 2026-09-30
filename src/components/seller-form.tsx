@@ -20,6 +20,7 @@ export function SellerForm() {
       const listing = await api<StyleListing>('/api/styles', {
         name: form.get('name'),
         handle: String(form.get('handle')).replace(/^@/, ''),
+        payoutAddress: String(form.get('payoutAddress') || '').trim(),
         description: form.get('description'),
         tags: String(form.get('tags'))
           .split(',')
@@ -83,6 +84,14 @@ export function SellerForm() {
               />
             </label>
           </div>
+          <label className="field">
+            Seller payout address <span>Optional · sandbox test USDC</span>
+            <input name="payoutAddress" maxLength={44} placeholder="Solana wallet address" />
+            <small>
+              Shared by all styles under this handle. Leave blank to keep the existing address or
+              use a demo wallet.
+            </small>
+          </label>
           <label className="field">
             Describe your style
             <textarea

@@ -1,6 +1,7 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { db, getJob, getStyle, getPrivateStyle, saveJob } from './db';
 import type { GenerationJob, JobWithStyle } from './types';
+import { paymentReady } from './payment-mode';
 
 // Claim tokens are kept in a separate table, never in public job responses.
 export const WORKER_LEASE_MS = 60_000;
@@ -83,6 +84,7 @@ export function claimNextJob(handle: string, workerName: string): WorkerAssignme
       .all() as { data: string }[];
     for (const row of rows) {
       const job: GenerationJob = JSON.parse(row.data);
+      if (!paymentReady(job)) continue;
       const style = getStyle(job.styleListingId);
       if (style?.seller.handle !== handle) continue;
       const claimToken = randomUUID();

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isAddress } from '@solana/addresses';
 const imageUrl = z
   .string()
   .regex(
@@ -19,6 +20,11 @@ export const jobSchema = z.object({
   selectedByAgent: z.boolean().default(false),
 });
 export const listingSchema = z.object({
+  payoutAddress: z
+    .string()
+    .trim()
+    .refine((value) => !value || isAddress(value), 'Enter a valid Solana payout address.')
+    .optional(),
   name: z.string().trim().min(3).max(70),
   handle: z
     .string()

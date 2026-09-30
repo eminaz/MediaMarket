@@ -25,6 +25,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@solana/addresses": "8.4.0",
     "@solana/pay-kit": "0.12.0",
     "lucide-react": "^1.49.0",
     "next": "^16.3.8",

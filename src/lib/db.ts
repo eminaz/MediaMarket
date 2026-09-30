@@ -1,13 +1,14 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { seeds } from './seed';
+import { seeds, seedPayoutAddresses } from './seed';
+import { defaultPayoutAddress, payoutOverrides, requirePayoutAddress } from './payout';
 import type { GenerationJob, PrivateStyleListing, Seller, StyleListing } from './types';
 
 export const dataDir = process.env.DATA_DIR
   ? path.resolve(/* turbopackIgnore: true */ process.env.DATA_DIR)
   : path.join(process.cwd(), 'data');
-let database: DatabaseSync;
+let database: DatabaseSync | undefined;
 export function db() {
   if (database) return database;
   mkdirSync(path.join(dataDir, 'media'), { recursive: true });
@@ -31,6 +32,9 @@ export function db() {
         displayName: seed.displayName,
         bio: 'Independent creative studio. Distinctive taste, on demand.',
         avatarUrl: '',
+        payoutAddress: requirePayoutAddress(
+          seedPayoutAddresses[seed.handle] || defaultPayoutAddress(seed.handle),
+        ),
       };
       database
         .prepare('INSERT OR IGNORE INTO sellers VALUES (?, ?, ?)')
@@ -69,9 +73,22 @@ export function db() {
           'One product or subject image (PNG, JPG, or WebP, up to 10 MB) and a short creative brief.',
         );
     }
+    const overrides = payoutOverrides();
+    const sellers = database.prepare('SELECT data FROM sellers').all() as { data: string }[];
+    for (const row of sellers) {
+      const seller: Seller = JSON.parse(row.data);
+      seller.payoutAddress = requirePayoutAddress(
+        overrides[seller.handle] || seller.payoutAddress || defaultPayoutAddress(seller.handle),
+      );
+      database
+        .prepare('UPDATE sellers SET data = ? WHERE id = ?')
+        .run(JSON.stringify(seller), seller.id);
+    }
     database.exec('COMMIT');
   } catch (error) {
     database.exec('ROLLBACK');
+    database.close();
+    database = undefined;
     throw error;
   }
   return database;
@@ -82,20 +99,29 @@ export function publicStyle(style: PrivateStyleListing): StyleListing {
   return safe;
 }
 export function getStyles() {
-  return (db().prepare('SELECT data FROM styles ORDER BY rowid').all() as { data: string }[]).map(
-    (row) => publicStyle(JSON.parse(row.data)),
-  );
+  return (
+    db()
+      .prepare(
+        'SELECT styles.data, sellers.data AS sellerData FROM styles JOIN sellers ON sellers.id = styles.sellerId ORDER BY styles.rowid',
+      )
+      .all() as { data: string; sellerData: string }[]
+  ).map((row) => publicStyle({ ...JSON.parse(row.data), seller: JSON.parse(row.sellerData) }));
 }
 export function getPrivateStyle(id: string): PrivateStyleListing | null {
   const row = db().prepare('SELECT data FROM styles WHERE id = ?').get(id) as
     { data: string } | undefined;
-  return row ? JSON.parse(row.data) : null;
+  if (!row) return null;
+  const style: PrivateStyleListing = JSON.parse(row.data);
+  const seller = db().prepare('SELECT data FROM sellers WHERE id = ?').get(style.sellerId) as {
+    data: string;
+  };
+  return { ...style, seller: JSON.parse(seller.data) };
 }
 export function getStyle(id: string) {
   const style = getPrivateStyle(id);
   return style ? publicStyle(style) : null;
 }
-export function saveStyle(style: PrivateStyleListing) {
+export function saveStyle(style: PrivateStyleListing, payoutAddress?: string) {
   const conn = db();
   conn.exec('BEGIN IMMEDIATE');
   try {
@@ -105,6 +131,12 @@ export function saveStyle(style: PrivateStyleListing) {
     if (existing) {
       style.seller = JSON.parse(existing.data);
       style.sellerId = style.seller.id;
+      if (payoutAddress) {
+        style.seller.payoutAddress = requirePayoutAddress(payoutAddress);
+        conn
+          .prepare('UPDATE sellers SET data = ? WHERE id = ?')
+          .run(JSON.stringify(style.seller), style.sellerId);
+      }
     } else
       conn
         .prepare('INSERT INTO sellers VALUES (?, ?, ?)')

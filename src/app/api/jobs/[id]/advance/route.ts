@@ -1,11 +1,12 @@
 import { db, getJob, getPrivateStyle, saveJob } from '@/lib/db';
 import { generateImage } from '@/lib/generation';
+import { paymentReady } from '@/lib/payment-mode';
 export const maxDuration = 180;
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const job = getJob((await params).id);
   if (!job) return Response.json({ error: 'Job not found.' }, { status: 404 });
-  if (job.paymentStatus !== 'confirmed')
-    return Response.json({ error: 'Confirm the simulated payment first.' }, { status: 409 });
+  if (!paymentReady(job))
+    return Response.json({ error: 'Payment must be verified before generation.' }, { status: 409 });
   if (job.status === 'delivered' || job.status === 'failed') return Response.json(job);
   // Remote jobs are only executed by a seller worker, even if no worker is online.
   if (job.executionMode === 'worker') return Response.json(job);

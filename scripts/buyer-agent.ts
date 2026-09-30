@@ -5,6 +5,7 @@ import { spawn, execFile } from 'node:child_process';
 import path from 'node:path';
 import type { AgentOrderView } from '../src/lib/agent-orders';
 import { PAY_SANDBOX_RPC } from '../src/lib/payment-mode';
+import { displayUsdc } from '../src/lib/payment-display';
 
 // An HTTP-only reference client. No marketplace DB, browser, model, or seller credentials.
 try {
@@ -125,29 +126,35 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
   );
   console.error(job.decisionReason);
   console.error(`View: ${resolveUrl(job.viewUrl)}`);
-  if (job.payment.status === 'pending') {
+  if (job.paymentUrl) {
     if (job.payment.mode !== 'pay-sandbox' || !job.paymentUrl)
       throw new Error('Complete payment on the saved order before resuming.');
-    console.error('Paying with pay.sh --sandbox. Test USDC only; waiting for verified settlement…');
+    console.error(
+      job.payment.receipt
+        ? 'Rechecking the saved settlement transaction. No second payment…'
+        : 'Paying with pay.sh --sandbox. Test USDC only; waiting for verified settlement…',
+    );
     try {
-      await promisify(execFile)(
-        'pay',
-        [
-          '--sandbox',
-          'curl',
-          '--silent',
-          '--show-error',
-          '--fail-with-body',
-          '-X',
-          'POST',
-          resolveUrl(job.paymentUrl),
-        ],
-        {
-          timeout: Math.min(timeLeft(), 180_000),
-          maxBuffer: 2 * 1024 * 1024,
-          env: { ...process.env, PAY_RPC_URL: PAY_SANDBOX_RPC },
-        },
-      );
+      if (job.payment.receipt) await request(job.paymentUrl, { method: 'POST' });
+      else
+        await promisify(execFile)(
+          'pay',
+          [
+            '--sandbox',
+            'curl',
+            '--silent',
+            '--show-error',
+            '--fail-with-body',
+            '-X',
+            'POST',
+            resolveUrl(job.paymentUrl),
+          ],
+          {
+            timeout: Math.min(timeLeft(), 180_000),
+            maxBuffer: 2 * 1024 * 1024,
+            env: { ...process.env, PAY_RPC_URL: PAY_SANDBOX_RPC },
+          },
+        );
     } catch (error) {
       const details = error as Error & { code?: string; stderr?: string };
       throw new Error(
@@ -159,12 +166,28 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
       throw new Error(
         'Payment remains pending. Resume the saved order; generation has not been authorized.',
       );
-    console.error(`Pay sandbox confirmed: ${job.payment.receipt?.transaction}`);
+  }
+  const evidence = job.payment.receipt?.evidence;
+  if (job.payment.mode === 'pay-sandbox' && !evidence)
+    throw new Error(
+      'Payment has no verified chain evidence. Inspect the saved order before continuing.',
+    );
+  if (evidence) {
+    console.error(`Paid ${displayUsdc(evidence.amountUsdc)} test USDC`);
+    console.error(
+      `Buyer: ${displayUsdc(evidence.buyerBalanceBefore)} → ${displayUsdc(evidence.buyerBalanceAfter)} (${displayUsdc(evidence.buyerDelta)}) · ${evidence.buyerAddress}`,
+    );
+    console.error(
+      `Seller: ${displayUsdc(evidence.sellerBalanceBefore)} → ${displayUsdc(evidence.sellerBalanceAfter)} (+${displayUsdc(evidence.sellerDelta)}) · ${evidence.sellerAddress}`,
+    );
+    console.error(`Tx: ${evidence.signature}\nPayment verified.`);
   }
   let lastStatus = '';
   while (job.status !== 'delivered') {
     if (job.status !== lastStatus) {
       console.error(`Status: ${job.status}${job.workerName ? ` on ${job.workerName}` : ''}`);
+      if (job.status === 'generating' && job.executionMode === 'worker')
+        console.error('Seller generating on its own machine…');
       lastStatus = job.status;
     }
     if (job.status === 'failed')

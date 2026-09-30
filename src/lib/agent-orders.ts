@@ -4,7 +4,7 @@ import { db, getJob, getStyle, saveJob } from './db';
 import { pickStyle } from './agent';
 import { createJob, orderableStyles } from './jobs';
 import { jobSchema, tagsSchema } from './validation';
-import { paymentMode, jobPaymentMode } from './payment-mode';
+import { paymentMode, jobPaymentMode, paymentReady } from './payment-mode';
 import type { GenerationJob, StyleListing } from './types';
 
 export const agentOrderSchema = z.object({
@@ -120,8 +120,9 @@ export function agentOrderView(job: GenerationJob) {
       status: job.paymentStatus,
       amountUsdc: job.priceUsdc,
       receipt: job.paymentReceipt || null,
+      verificationError: job.paymentVerificationError || null,
     },
-    paymentUrl: job.paymentStatus === 'pending' ? `/api/jobs/${job.id}/pay` : null,
+    paymentUrl: !paymentReady(job) ? `/api/jobs/${job.id}/pay` : null,
     style: getStyle(job.styleListingId),
     desiredTags: job.desiredTags,
     decisionReason: job.decisionReason,

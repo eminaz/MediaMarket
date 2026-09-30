@@ -47,6 +47,7 @@ export function createJob(values: unknown, requestSource: 'web' | 'agent' = 'web
     decisionReason: pick?.reason || 'Handpicked by you.',
     paymentStatus: 'pending',
     paymentMode: paymentMode(),
+    payoutAddress: style.seller.payoutAddress,
     paymentConfirmedAt: null,
     priceUsdc: style.priceUsdc,
     outputImageUrl: null,

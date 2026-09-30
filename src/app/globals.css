@@ -3670,6 +3670,86 @@ button {
   border-radius: 8px;
   color: #708951;
 }
+.payment-proof {
+  padding: 22px;
+  border: 1px solid #d7e4ce;
+  border-radius: 12px;
+  background: #f4f8ef;
+  min-width: 0;
+}
+.payment-proof-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #42613d;
+}
+.payment-proof-title h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.payment-proof-network {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #64755a;
+  margin-top: 9px;
+}
+.payment-proof-wallet {
+  padding: 17px 0;
+  border-bottom: 1px solid #dce6d5;
+}
+.payment-proof-wallet > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.payment-proof-wallet code {
+  color: #737c6b;
+  font-size: 10px;
+}
+.payment-proof-wallet p {
+  font-size: 13px;
+  margin: 9px 0 5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.payment-proof-wallet b {
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.payment-credit {
+  color: #397042;
+}
+.payment-proof details {
+  margin-top: 16px;
+  font-size: 11px;
+}
+.payment-proof summary {
+  cursor: pointer;
+}
+.payment-proof details code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.payment-proof details p {
+  margin: 12px 0 4px;
+  color: #65715e;
+}
+.payment-proof-note {
+  color: #6d7865;
+  font-size: 10px;
+  line-height: 1.7;
+  margin-top: 16px;
+}
+.payment-proof-status {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #42613d;
+  margin-top: 12px;
+}
 .worker-handoff > svg {
   flex-shrink: 0;
 }
