@@ -12,6 +12,10 @@ export default defineConfig({
     url: 'http://127.0.0.1:3100',
     timeout: 120_000,
     reuseExistingServer: false,
-    env: { GENERATION_MODE: 'mock', DATA_DIR: path.resolve('data', `test-${Date.now()}`) },
+    env: {
+      GENERATION_MODE: 'mock',
+      EXECUTION_MODE: 'local',
+      DATA_DIR: path.resolve('data', `test-${Date.now()}`),
+    },
   },
 });

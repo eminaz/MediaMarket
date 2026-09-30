@@ -10,11 +10,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { getStyle, getStyles } from '@/lib/db';
+import { executionMode, sellerHasWorker } from '@/lib/workers';
 import { Avatar, StyleArtwork, StyleCard, Tags, Usdc } from '@/components/ui';
 export const dynamic = 'force-dynamic';
 export default async function StylePage({ params }: { params: Promise<{ id: string }> }) {
   const style = getStyle((await params).id);
   if (!style) notFound();
+  const available = executionMode() === 'local' || sellerHasWorker(style.seller.handle);
   return (
     <div className="page-wrap">
       <Link className="back-link" href="/#styles">
@@ -64,8 +66,17 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
               <Clock3 size={15} />~{style.etaSeconds}s delivery
             </span>
           </div>
-          <Link className="button button-dark button-full" href={`/create?style=${style.id}`}>
-            Use this style <ArrowRight size={17} />
+          {!available && (
+            <p className="mode-note">
+              This seller is not connected to this worker demo yet. Choose a style from a configured
+              seller to create an image.
+            </p>
+          )}
+          <Link
+            className="button button-dark button-full"
+            href={available ? `/create?style=${style.id}` : '/create'}
+          >
+            {available ? 'Use this style' : 'See connected sellers'} <ArrowRight size={17} />
           </Link>
           <p className="checkout-note">
             <ShieldCheck size={13} />

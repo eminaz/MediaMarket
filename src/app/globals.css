@@ -3658,3 +3658,42 @@ button {
     scroll-behavior: auto !important;
   }
 }
+
+.worker-handoff {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px 23px;
+  margin-bottom: 25px;
+  background: #eef3df;
+  border: 1px solid #d8e2c1;
+  border-radius: 8px;
+  color: #708951;
+}
+.worker-handoff > svg {
+  flex-shrink: 0;
+}
+.worker-handoff strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.worker-handoff p {
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 6px;
+  color: #889b6d;
+}
+.worker-handoff .demo-badge {
+  margin-left: auto;
+  white-space: nowrap;
+}
+@media (max-width: 580px) {
+  .worker-handoff {
+    padding: 17px;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .worker-handoff .demo-badge {
+    display: none;
+  }
+}

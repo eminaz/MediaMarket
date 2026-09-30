@@ -250,6 +250,18 @@ export function CreateFlow({
                 </div>
               )}
               <div className="style-options">
+                {mode === 'worker' && (
+                  <p className="mode-note">
+                    Showing styles from sellers configured for this worker demo. Their laptop must
+                    be running to deliver your image.
+                  </p>
+                )}
+                {styles.length === 0 && (
+                  <p className="error-message" role="alert">
+                    No seller workers are configured. Add a seller token on the marketplace or use
+                    the distributed demo launcher.
+                  </p>
+                )}
                 {styles.map((s) => (
                   <button
                     key={s.id}
@@ -347,9 +359,11 @@ export function CreateFlow({
                   <strong>USDC, with a Solana state of mind.</strong>
                   <p>
                     This is a simulated payment. No wallet, real tokens, or network fees.{' '}
-                    {mode === 'mock'
-                      ? 'Your image uses our local demo compositor.'
-                      : 'Image generation uses the configured live API.'}
+                    {mode === 'worker'
+                      ? 'A separate seller worker will compose your image and send it back.'
+                      : mode === 'mock'
+                        ? 'Your image uses our local demo compositor.'
+                        : 'Image generation uses the configured live API.'}
                   </p>
                 </div>
                 <span className="demo-badge">DEMO</span>
@@ -448,7 +462,11 @@ export function CreateFlow({
           )}
           <div className="aside-footnote">
             <span className="status-dot" />
-            {mode === 'mock' ? 'Demo mode · no API key needed' : 'Live image generation enabled'}
+            {mode === 'worker'
+              ? 'Seller laptop mode · mock image renderer'
+              : mode === 'mock'
+                ? 'Demo mode · no API key needed'
+                : 'Live image generation enabled'}
           </div>
         </aside>
       </div>

@@ -41,6 +41,9 @@ export type GenerationJob = {
   priceUsdc: number;
   outputImageUrl: string | null;
   generationMode: string | null;
+  executionMode?: 'local' | 'worker';
+  workerName?: string | null;
+  workerClaimedAt?: string | null;
   error: string | null;
   createdAt: string;
   updatedAt: string;

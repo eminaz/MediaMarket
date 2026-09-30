@@ -8,10 +8,13 @@
     "build": "next build",
     "start": "next start",
     "seed": "tsx scripts/seed.ts",
+    "worker": "tsx scripts/seller-worker.ts",
+    "demo:distributed": "tsx scripts/distributed-demo.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:worker": "playwright test --config playwright.worker.config.ts"
   },
   "keywords": [],
   "author": "",

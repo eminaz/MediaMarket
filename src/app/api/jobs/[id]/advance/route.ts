@@ -7,6 +7,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (job.paymentStatus !== 'confirmed')
     return Response.json({ error: 'Confirm the simulated payment first.' }, { status: 409 });
   if (job.status === 'delivered' || job.status === 'failed') return Response.json(job);
+  // Remote jobs are only executed by a seller worker, even if no worker is online.
+  if (job.executionMode === 'worker') return Response.json(job);
   const elapsed = Date.now() - Date.parse(job.updatedAt);
   if (job.status === 'queued') {
     if (elapsed < 1200) return Response.json(job);

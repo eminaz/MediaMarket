@@ -9,6 +9,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       ...job,
       status: 'queued',
       generationMode: null,
+      workerName: null,
+      workerClaimedAt: null,
       error: null,
       updatedAt: new Date().toISOString(),
     }),

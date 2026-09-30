@@ -2,17 +2,23 @@ import { z } from 'zod';
 import { getStyles } from '@/lib/db';
 import { pickStyle } from '@/lib/agent';
 import { apiError, tagsSchema } from '@/lib/validation';
+import { executionMode, sellerHasWorker } from '@/lib/workers';
 export async function POST(request: Request) {
   try {
     const { budget, desiredTags } = z
       .object({ budget: z.number().finite().positive().max(10000), desiredTags: tagsSchema })
       .parse(await request.json());
-    const pick = pickStyle(getStyles(), budget, desiredTags);
+    const available = getStyles().filter(
+      (style) => executionMode() === 'local' || sellerHasWorker(style.seller.handle),
+    );
+    const pick = pickStyle(available, budget, desiredTags);
     if (!pick)
       return Response.json(
         {
           error:
-            'No styles fit this budget. Try at least 0.75 USDC, or publish a more affordable style.',
+            executionMode() === 'worker'
+              ? 'No configured seller styles fit this budget. Increase your budget or connect another seller worker.'
+              : 'No styles fit this budget. Try at least 0.75 USDC, or publish a more affordable style.',
         },
         { status: 422 },
       );

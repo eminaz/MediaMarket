@@ -1,6 +1,7 @@
 .next
 node_modules
 data
+worker-data
 test-results
 playwright-report
 package-lock.json

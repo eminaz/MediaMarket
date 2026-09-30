@@ -16,6 +16,7 @@ export function db() {
     CREATE TABLE IF NOT EXISTS sellers (id TEXT PRIMARY KEY, handle TEXT UNIQUE NOT NULL, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS styles (id TEXT PRIMARY KEY, sellerId TEXT NOT NULL REFERENCES sellers(id), data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, styleListingId TEXT NOT NULL REFERENCES styles(id), data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS worker_claims (jobId TEXT PRIMARY KEY REFERENCES jobs(id), sellerHandle TEXT NOT NULL, token TEXT NOT NULL, expiresAt INTEGER NOT NULL);
   `);
   const now = new Date().toISOString();
   database.exec('BEGIN IMMEDIATE');

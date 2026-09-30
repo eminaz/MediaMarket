@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Tastemaker · Seller machine</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f6f6ef;
+        color: #2c3426;
+        font:
+          14px Arial,
+          sans-serif;
+      }
+      header {
+        border-bottom: 1px solid #dde2d2;
+        padding: 24px 6%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .logo {
+        font-size: 23px;
+        font-weight: 700;
+        letter-spacing: -1px;
+      }
+      .logo span {
+        color: #7b9058;
+        font-size: 30px;
+        vertical-align: middle;
+        margin-right: 9px;
+      }
+      .label {
+        font-size: 10px;
+        letter-spacing: 2px;
+        color: #7e8e68;
+      }
+      main {
+        max-width: 1100px;
+        margin: auto;
+        padding: 48px 28px;
+      }
+      h1 {
+        font:
+          42px Georgia,
+          serif;
+        letter-spacing: -1px;
+        margin: 15px 0;
+      }
+      p {
+        color: #7e8c6d;
+        line-height: 1.8;
+      }
+      button {
+        background: #2d3825;
+        color: #fff;
+        border: 0;
+        border-radius: 7px;
+        padding: 13px 20px;
+        cursor: pointer;
+        font: inherit;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #829652;
+        outline-offset: 4px;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 25px;
+        margin-bottom: 30px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 25px;
+      }
+      .panel {
+        background: #fffef9;
+        border: 1px solid #e0e5d5;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .status {
+        padding: 28px;
+        border-bottom: 1px solid #e0e5d5;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+      .star {
+        font-size: 50px;
+        color: #90a46d;
+        line-height: 1;
+      }
+      .running .star {
+        animation: spin 9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      h2 {
+        font:
+          25px Georgia,
+          serif;
+        margin: 8px 0;
+      }
+      small {
+        font-size: 11px;
+        color: #8e9f79;
+      }
+      .job {
+        padding: 25px;
+      }
+      .job h3 {
+        font-size: 16px;
+        margin: 10px 0;
+      }
+      .job p {
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      .jobcode {
+        font: 11px monospace;
+        color: #a1ad90;
+      }
+      .log {
+        padding: 0 25px 25px;
+        min-height: 180px;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .event {
+        border-top: 1px solid #edf0e6;
+        padding: 12px 0;
+        font-size: 11px;
+        line-height: 1.7;
+        color: #687e50;
+      }
+      .event time {
+        display: block;
+        color: #a7b395;
+        font-size: 10px;
+      }
+      .preview {
+        padding: 20px;
+        background: #eaf0de;
+        min-height: 320px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .preview img {
+        width: 100%;
+        max-height: 480px;
+        object-fit: contain;
+      }
+      .preview p {
+        text-align: center;
+        padding: 35px;
+      }
+      .caption {
+        padding: 20px;
+        font-size: 12px;
+        line-height: 1.8;
+        color: #7e9365;
+      }
+      .connection {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11px;
+        color: #8e9e78;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 100%;
+        background: #bc916a;
+      }
+      .online .dot {
+        background: #829f5a;
+      }
+      .facts {
+        margin-top: 30px;
+        padding: 20px 25px;
+        border: 1px solid #dde5ce;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.8;
+        color: #859672;
+        background: #eef2e5;
+      }
+      .facts b {
+        color: #566c3d;
+      }
+      .muted {
+        font-size: 11px;
+        color: #9ca88b;
+        margin-top: 23px;
+      }
+      #marketplace,
+      #worker-name {
+        overflow-wrap: anywhere;
+      }
+      @media (max-width: 700px) {
+        main {
+          padding: 30px 20px;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .top {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        h1 {
+          font-size: 35px;
+        }
+        header {
+          padding: 20px;
+        }
+        .label {
+          font-size: 8px;
+        }
+        .status {
+          padding: 22px;
+        }
+        .preview {
+          min-height: 200px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .running .star {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a class="logo" href="/" aria-label="Seller dashboard"><span>✳</span>tastemaker.</a
+      ><span class="label">SELLER MACHINE / MOCK RENDERER</span>
+    </header>
+    <main>
+      <div class="top">
+        <div>
+          <span class="label">YOUR LAPTOP. YOUR CREATIVE STUDIO.</span>
+          <h1 id="worker-name">Connecting your studio…</h1>
+          <p>Orders arrive here. Images are composed on this machine.</p>
+        </div>
+        <button id="toggle" disabled>Pause worker</button>
+      </div>
+      <div class="grid">
+        <section class="panel">
+          <div class="status" id="status">
+            <span class="star">✳</span>
+            <div>
+              <div class="connection" id="connection">
+                <span class="dot"></span><span id="connection-text">Connecting to marketplace</span>
+              </div>
+              <h2 id="phase">Connecting</h2>
+              <small id="seller"></small>
+            </div>
+          </div>
+          <div class="job">
+            <span class="label">CURRENT ORDER</span>
+            <h3 id="style">Waiting for your next good idea.</h3>
+            <div class="jobcode" id="job-id"></div>
+            <p id="brief">Only paid orders for your seller handle will be claimed.</p>
+          </div>
+          <div class="log" id="log" aria-label="Worker activity"></div>
+        </section>
+        <aside class="panel">
+          <div class="preview">
+            <p id="empty">Your next creation<br />will appear here.</p>
+            <img id="output" alt="Latest image generated on this seller machine" hidden />
+          </div>
+          <div class="caption">
+            <b id="completed">0 images delivered</b><br />PNG saved locally, then uploaded to the
+            marketplace.
+          </div>
+        </aside>
+      </div>
+      <div class="facts">
+        <b>A real network handoff. A mock image renderer.</b><br />The marketplace queues an order →
+        this worker downloads the input → this laptop builds the PNG → the finished image travels
+        back to the buyer. Pausing stops new claims; an active job finishes normally.
+      </div>
+      <p class="muted">
+        Marketplace: <a id="marketplace" target="_blank" rel="noopener"></a> · No real USDC
+        transfers. This dashboard runs on the seller’s machine.
+      </p>
+    </main>
+    <script>
+      const el = (id) => document.getElementById(id);
+      let lastOutput = '',
+        lastEvents = '';
+      async function refresh() {
+        try {
+          const s = await (await fetch('/api/status')).json();
+          el('worker-name').textContent = s.workerName;
+          el('phase').textContent = s.phase;
+          el('seller').textContent = '@' + s.seller;
+          el('connection-text').textContent = s.paused
+            ? 'Claims paused'
+            : s.connected
+              ? 'Marketplace connected'
+              : 'Marketplace disconnected';
+          el('connection').className = 'connection ' + (s.connected ? 'online' : '');
+          el('status').className = 'status ' + (s.currentJob ? 'running' : '');
+          el('toggle').textContent = s.paused ? 'Resume worker' : 'Pause worker';
+          el('toggle').disabled = false;
+          el('marketplace').textContent = s.marketplace;
+          el('marketplace').href = s.marketplace;
+          el('style').textContent = s.currentJob?.style || 'Waiting for your next good idea.';
+          el('job-id').textContent = s.currentJob?.id || '';
+          el('brief').textContent =
+            s.currentJob?.brief || 'Only paid orders for your seller handle will be claimed.';
+          el('completed').textContent =
+            s.completed + ' image' + (s.completed === 1 ? '' : 's') + ' delivered';
+          if (s.lastOutput && s.lastOutput !== lastOutput) {
+            el('output').src = '/output.png?id=' + encodeURIComponent(s.lastOutput);
+            el('output').hidden = false;
+            el('empty').hidden = true;
+            lastOutput = s.lastOutput;
+          }
+          const signature = JSON.stringify(s.events);
+          if (signature !== lastEvents) {
+            el('log').replaceChildren(
+              ...s.events.map((e) => {
+                const row = document.createElement('div');
+                row.className = 'event';
+                const time = document.createElement('time');
+                time.textContent = new Date(e.time).toLocaleTimeString();
+                row.append(time, document.createTextNode(e.message));
+                return row;
+              }),
+            );
+            lastEvents = signature;
+          }
+        } catch {
+          el('connection-text').textContent = 'Worker server is offline';
+          el('connection').className = 'connection';
+          el('toggle').disabled = true;
+        }
+      }
+      el('toggle').onclick = async () => {
+        el('toggle').disabled = true;
+        try {
+          await fetch('/api/toggle', { method: 'POST' });
+        } finally {
+          await refresh();
+        }
+      };
+      refresh();
+      setInterval(refresh, 1000);
+    </script>
+  </body>
+</html>

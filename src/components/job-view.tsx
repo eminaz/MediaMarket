@@ -9,6 +9,7 @@ import {
   Clock3,
   Download,
   LoaderCircle,
+  Laptop,
   RotateCcw,
   Sparkles,
 } from 'lucide-react';
@@ -31,7 +32,11 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
         if (stopped) return;
         setJob(latest);
         setError('');
-        if (!advancing.current && !['delivered', 'failed'].includes(latest.status)) {
+        if (
+          latest.executionMode !== 'worker' &&
+          !advancing.current &&
+          !['delivered', 'failed'].includes(latest.status)
+        ) {
           advancing.current = true;
           void api(`/api/jobs/${initialJob.id}/advance`, {})
             .catch((e) => {
@@ -109,6 +114,28 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                 : 'In the studio'}
         </span>
       </div>
+      {job.executionMode === 'worker' && (
+        <div className="worker-handoff" aria-live="polite">
+          <Laptop size={23} />
+          <div>
+            <strong>
+              {done
+                ? `Generated on ${job.workerName}`
+                : job.status === 'generating'
+                  ? `Generating on ${job.workerName}`
+                  : job.status === 'failed'
+                    ? 'Seller worker interrupted'
+                    : `Waiting for @${job.style.seller.handle}’s laptop`}
+            </strong>
+            <p>
+              {done
+                ? 'The seller’s machine composed this PNG and uploaded it to the marketplace. Mock renderer · real HTTP handoff.'
+                : 'This order runs on the seller’s worker. If it is paused or offline, the order waits; the marketplace does not generate it.'}
+            </p>
+          </div>
+          <span className="demo-badge">SELLER WORKER</span>
+        </div>
+      )}
       <div className="job-grid">
         <section className="result-panel">
           {done && job.outputImageUrl ? (
@@ -156,10 +183,14 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                 {job.paymentStatus === 'pending'
                   ? 'One step from something good.'
                   : job.status === 'queued'
-                    ? 'Your spot in the studio is ready.'
+                    ? job.executionMode === 'worker'
+                      ? 'Waiting for your seller’s studio.'
+                      : 'Your spot in the studio is ready.'
                     : job.status === 'failed'
                       ? 'The studio hit a snag.'
-                      : 'A new perspective is taking shape.'}
+                      : job.executionMode === 'worker'
+                        ? 'Your seller’s laptop is at work.'
+                        : 'A new perspective is taking shape.'}
               </h2>
               <p>
                 {job.error ||
@@ -261,7 +292,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
             )}
             <div className="mode-note">
               {job.generationMode === 'mock'
-                ? 'Made with our local demo compositor. Your input is arranged into a style-specific poster; this is not an AI image edit.'
+                ? `${job.executionMode === 'worker' ? 'Composed on the seller’s machine and delivered over HTTP.' : 'Made with our local demo compositor.'} Your input is arranged into a style-specific poster; this is not an AI image edit.`
                 : 'Signature style. One image at a time.'}
             </div>
           </div>
