@@ -7,17 +7,21 @@ import type { StyleListing } from '@/lib/types';
 import { ImageUpload } from './image-upload';
 export function SellerForm() {
   const router = useRouter();
+  const [mediaType, setMediaType] = useState<'image' | 'music'>('image');
   const [samples, setSamples] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
-    if (!samples.length) return setError('Add at least one sample image to show your style.');
+    if (!samples.length && mediaType === 'image')
+      return setError('Add at least one sample image to show your style.');
     setBusy(true);
     const form = new FormData(event.currentTarget);
     try {
       const listing = await api<StyleListing>('/api/styles', {
+        type: mediaType,
+        durationSeconds: mediaType === 'music' ? Number(form.get('duration')) : undefined,
         name: form.get('name'),
         handle: String(form.get('handle')).replace(/^@/, ''),
         payoutAddress: String(form.get('payoutAddress') || '').trim(),
@@ -28,7 +32,7 @@ export function SellerForm() {
           .filter(Boolean),
         priceUsdc: Number(form.get('price')),
         etaSeconds: Number(form.get('eta')),
-        sampleImages: samples,
+        sampleImages: samples.length ? samples : ['/samples/luxury.jpg'],
         hiddenWorkflowPrompt: form.get('workflow'),
         publicPromptSummary: form.get('summary'),
         inputRequirements: form.get('requirements'),
@@ -62,6 +66,30 @@ export function SellerForm() {
               <p>A repeatable recipe. An unmistakable point of view.</p>
             </div>
           </div>
+          <label className="field">
+            Media type
+            <select
+              value={mediaType}
+              onChange={(e) => setMediaType(e.target.value as 'image' | 'music')}
+            >
+              <option value="image">Image</option>
+              <option value="music">Music</option>
+            </select>
+          </label>
+          {mediaType === 'music' && (
+            <label className="field">
+              Track duration <span>Seconds · included in the fixed price</span>
+              <input
+                name="duration"
+                type="number"
+                min="5"
+                max="30"
+                step="1"
+                defaultValue="10"
+                required
+              />
+            </label>
+          )}
           <div className="field-row">
             <label className="field">
               Style name
@@ -100,7 +128,7 @@ export function SellerForm() {
               minLength={20}
               maxLength={1500}
               rows={3}
-              placeholder="What makes your style different? What kind of images does it create?"
+              placeholder="What makes your style different? What will buyers receive?"
             />
           </label>
           <label className="field">
@@ -117,7 +145,7 @@ export function SellerForm() {
           </label>
           <div className="field-row">
             <label className="field">
-              Price per image <span>USDC</span>
+              {mediaType === 'music' ? 'Price per track' : 'Price per image'} <span>USDC</span>
               <input
                 name="price"
                 type="number"
@@ -134,7 +162,12 @@ export function SellerForm() {
             </label>
           </div>
           <div className="field">
-            Show your signature <span>1–3 sample images</span>
+            Show your signature{' '}
+            <span>
+              {mediaType === 'music'
+                ? 'Optional cover artwork · defaults to our demo cover'
+                : '1–3 sample images'}
+            </span>
           </div>
           <div className="sample-thumbs">
             {samples.map((src, i) => (
@@ -165,7 +198,12 @@ export function SellerForm() {
               minLength={5}
               maxLength={500}
               rows={2}
-              defaultValue="A short text brief describing the subject, scene, and desired mood."
+              key={mediaType}
+              defaultValue={
+                mediaType === 'music'
+                  ? 'A short text brief describing mood, instruments, tempo, and intended use.'
+                  : 'A short text brief describing the subject, scene, and desired mood.'
+              }
             />
           </label>
           <label className="field">
@@ -206,7 +244,7 @@ export function SellerForm() {
           </div>
           <label className="checkbox-field">
             <input name="commercial" type="checkbox" defaultChecked />
-            <span>Allow commercial use of images created with this style.</span>
+            <span>Allow commercial use of creations made with this style.</span>
           </label>
           {error && (
             <p className="error-message" role="alert">

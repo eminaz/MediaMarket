@@ -17,7 +17,7 @@ export default function JobsPage() {
         </div>
         <Link className="button button-dark" href="/create">
           <Plus size={16} />
-          Create an image
+          Create something
         </Link>
       </div>
       {jobs.length ? (

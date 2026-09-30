@@ -1,6 +1,7 @@
 // Optional seller-level seed overrides. Existing installations can use SELLER_PAYOUT_ADDRESSES.
 export const seedPayoutAddresses: Record<string, string> = {};
 export const seeds = [
+  // Keep image seeds first so existing curated artwork remains unchanged.
   {
     id: 'luxury-product-ad',
     name: 'Luxury Product Ad',
@@ -96,5 +97,23 @@ export const seeds = [
     summary: 'Naturally considered. Beautifully understated.',
     prompt:
       'Create a botanical editorial product advertisement. Earthy green, tactile cream paper, organic plant shapes and quiet serif typography. Natural light and deliberate negative space.',
+  },
+  {
+    id: 'luxury-ambient-music',
+    type: 'music' as const,
+    durationSeconds: 10,
+    name: 'Luxury Ambient Music',
+    handle: 'studio.aure',
+    displayName: 'Studio Auré',
+    description:
+      'An understated soundtrack for perfume films, product reveals, and quiet brand moments. Warm piano, shimmering textures, and a gentle electronic pulse. A 10-second instrumental WAV, generated for your brief.',
+    tags: ['luxury', 'minimal', 'ambient', 'piano'],
+    priceUsdc: 2.5,
+    etaSeconds: 120,
+    palette: 'luxury',
+    sample: 'luxury.jpg',
+    summary: 'Warm piano. Shimmering textures. A little room to breathe.',
+    prompt:
+      'Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, spacious and restrained arrangement, no vocals.',
   },
 ];

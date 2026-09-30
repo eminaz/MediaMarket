@@ -25,6 +25,7 @@ const filters = [
   { label: 'Organic', tag: 'organic' },
 ];
 export function Marketplace({ styles }: { styles: StyleListing[] }) {
+  const [mediaType, setMediaType] = useState('image');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('');
   const [sort, setSort] = useState('curated');
@@ -35,6 +36,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
       styles
         .filter(
           (s) =>
+            s.type === mediaType &&
             (!filter ||
               s.tags.includes(filter) ||
               (filter === 'luxury' && s.tags.includes('minimal'))) &&
@@ -50,7 +52,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
               ? a.etaSeconds - b.etaSeconds
               : 0,
         ),
-    [styles, search, filter, sort, maxPrice],
+    [styles, search, filter, sort, maxPrice, mediaType],
   );
   return (
     <div className="home-wrap">
@@ -61,7 +63,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
             THE CREATIVE MARKETPLACE FOR AGENTS
           </div>
           <h1>
-            Good tools make images.
+            Good tools create.
             <br />
             Great taste makes
             <br />
@@ -154,6 +156,22 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
           <span className="collection-label">
             THE STYLE COLLECTION <span>↙</span>
           </span>
+        </div>
+        <div className="media-tabs" role="group" aria-label="Media type">
+          {['image', 'music'].map((type) => (
+            <button
+              key={type}
+              className={`button ${mediaType === type ? 'button-dark' : 'button-light'}`}
+              aria-pressed={mediaType === type}
+              onClick={() => {
+                setMediaType(type);
+                setFilter('');
+                setSearch('');
+              }}
+            >
+              {type === 'music' ? 'Music' : 'Images'}
+            </button>
+          ))}
         </div>
         <div className="market-toolbar">
           <div className="filter-tabs" role="group" aria-label="Filter by vibe">
@@ -291,7 +309,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
             {
               n: '03',
               title: 'Make it unmistakably yours.',
-              body: 'Pay per image in demo USDC. Get a creation, ready to download.',
+              body: 'Pay per creation in USDC. Get a creation, ready to download.',
             },
           ].map((s) => (
             <div key={s.n}>

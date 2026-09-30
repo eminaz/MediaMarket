@@ -34,7 +34,7 @@ export function Header() {
           </span>
           <Link className="button button-dark button-sm" href="/create">
             <Plus size={15} />
-            Create an image
+            Create something
           </Link>
         </div>
       </div>

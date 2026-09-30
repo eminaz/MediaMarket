@@ -8,7 +8,7 @@ import { paymentMode } from './payment-mode';
 export function orderableStyles() {
   return getStyles().filter(
     (style) =>
-      style.type === 'image' &&
+      ['image', 'music'].includes(style.type) &&
       (executionMode() === 'local' || sellerHasWorker(style.seller.handle)),
   );
 }
@@ -16,7 +16,8 @@ export function orderableStyles() {
 export function createJob(values: unknown, requestSource: 'web' | 'agent' = 'web') {
   const input = jobSchema.parse(values);
   const style = getStyle(input.styleListingId);
-  if (!style || style.type !== 'image') throw new Error('This image style is no longer available.');
+  if (!style || (style.type !== 'image' && style.type !== 'music'))
+    throw new Error('This style is no longer available.');
   if (input.budget < style.priceUsdc) throw new Error('The selected style exceeds your budget.');
   const execution = executionMode();
   if (execution === 'worker' && !sellerHasWorker(style.seller.handle))
@@ -25,7 +26,7 @@ export function createJob(values: unknown, requestSource: 'web' | 'agent' = 'web
     );
   if (input.inputImageUrl)
     throw new Error(
-      'New orders are text-to-image. Describe your subject in the brief; reference images will be supported later.',
+      'New orders use text briefs. Describe your image or music; reference uploads will be supported later.',
     );
   const pick = input.selectedByAgent
     ? pickStyle(
@@ -34,6 +35,7 @@ export function createJob(values: unknown, requestSource: 'web' | 'agent' = 'web
         ),
         input.budget,
         input.desiredTags,
+        style.type,
       )
     : null;
   if (input.selectedByAgent && pick?.style.id !== style.id)

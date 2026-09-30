@@ -105,7 +105,7 @@ function kitFor(job: GenerationJob) {
           name: job.id,
           externalId: job.id,
           amount: usd(job.priceUsdc.toFixed(2)),
-          description: `Tastemaker image order ${job.id}`,
+          description: `Tastemaker ${getStyle(job.styleListingId)?.type || 'image'} order ${job.id}`,
         },
         { accept: ['mpp'], payTo: recipient },
       );

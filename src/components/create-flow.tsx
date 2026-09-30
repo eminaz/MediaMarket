@@ -28,6 +28,9 @@ const vibes = [
   'dark',
   'meme',
   'organic',
+  'ambient',
+  'piano',
+  'electronic',
 ];
 export function CreateFlow({
   styles,
@@ -43,6 +46,10 @@ export function CreateFlow({
   paymentMode: 'simulated' | 'pay-sandbox';
 }) {
   const router = useRouter();
+  const [mediaType, setMediaType] = useState<'image' | 'music'>(
+    styles.find((s) => s.id === initialStyle)?.type === 'music' ? 'music' : 'image',
+  );
+  const matchingStyles = styles.filter((s) => s.type === mediaType);
   const [step, setStep] = useState(1);
   const [brief, setBrief] = useState('');
   const [brand, setBrand] = useState('');
@@ -71,6 +78,7 @@ export function CreateFlow({
       const pick = await api<{ style: StyleListing; reason: string }>('/api/agent/pick', {
         budget: Number(budget),
         desiredTags: tags,
+        type: mediaType,
       });
       setSelected(pick.style);
       setAgent(true);
@@ -150,16 +158,39 @@ export function CreateFlow({
                 <span className="section-number">01</span>
                 <div>
                   <h2>Give us the starting point.</h2>
-                  <p>Describe a product, a portrait, or a scene. No image needed.</p>
+                  <p>
+                    {mediaType === 'music'
+                      ? 'Describe the mood, instruments, tempo, and intended use.'
+                      : 'Describe a product, a portrait, or a scene. No image needed.'}
+                  </p>
                 </div>
               </div>
+              <label className="field">
+                What would you like to create?
+                <select
+                  value={mediaType}
+                  onChange={(e) => {
+                    setMediaType(e.target.value as 'image' | 'music');
+                    setSelected(null);
+                    setAgent(false);
+                    setReason('');
+                  }}
+                >
+                  <option value="image">Image</option>
+                  <option value="music">Music</option>
+                </select>
+              </label>
               <label className="field">
                 The brief <span>What are we making?</span>
                 <textarea
                   value={brief}
                   maxLength={1000}
                   onChange={(e) => setBrief(e.target.value)}
-                  placeholder="A launch campaign for my new skincare line. Think quiet luxury, morning light, and less-is-more energy."
+                  placeholder={
+                    mediaType === 'music'
+                      ? 'Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, no vocals'
+                      : 'A launch campaign for my new skincare line. Think quiet luxury, morning light, and less-is-more energy.'
+                  }
                   rows={4}
                 />
               </label>
@@ -254,16 +285,16 @@ export function CreateFlow({
                 {mode === 'worker' && (
                   <p className="mode-note">
                     Showing styles from sellers configured for this worker demo. Their laptop must
-                    be running to deliver your image.
+                    be running to deliver your creation.
                   </p>
                 )}
-                {styles.length === 0 && (
+                {matchingStyles.length === 0 && (
                   <p className="error-message" role="alert">
-                    No seller workers are configured. Add a seller token on the marketplace or use
-                    the distributed demo launcher.
+                    No {mediaType} styles are available to order. Publish a matching style and
+                    configure its seller worker, or choose another media type.
                   </p>
                 )}
-                {styles.map((s) => (
+                {matchingStyles.map((s) => (
                   <button
                     key={s.id}
                     disabled={s.priceUsdc > Number(budget) || busy}
@@ -278,7 +309,8 @@ export function CreateFlow({
                     <span className="option-copy">
                       <strong>{s.name}</strong>
                       <span>
-                        @{s.seller.handle} · ~{s.etaSeconds}s
+                        @{s.seller.handle} · ~{s.etaSeconds}s{' '}
+                        {s.type === 'music' && `· ${s.durationSeconds || 10}s track`}
                       </span>
                       <span>{s.tags.join(' · ')}</span>
                       <Rating {...s} />
@@ -328,12 +360,19 @@ export function CreateFlow({
               </div>
               <div className="review-input">
                 <div>
-                  <span className="eyebrow muted">TEXT TO IMAGE</span>
+                  <span className="eyebrow muted">
+                    {mediaType === 'music' ? 'TEXT TO MUSIC' : 'TEXT TO IMAGE'}
+                  </span>
                   <h3>{brand || 'Untitled creation'}</h3>
                   <p>{brief}</p>
                   <Tags tags={tags} />
                 </div>
               </div>
+              {selected.type === 'music' && (
+                <p className="mode-note">
+                  {selected.durationSeconds || 10}-second music clip · WAV · fixed price per clip
+                </p>
+              )}
               <div className="order-lines">
                 <div>
                   <span>{selected.name}</span>
@@ -363,10 +402,12 @@ export function CreateFlow({
                       ? 'Pay.sh sandbox checkout. Create your order, then pay from your local agent or terminal with test USDC. '
                       : 'This is a simulated payment. No wallet, real tokens, or network fees. '}
                     {mode === 'worker'
-                      ? 'Your seller’s machine will generate the image and send it back.'
-                      : mode === 'mock'
-                        ? 'Your image uses our local demo compositor.'
-                        : 'Image generation uses the configured live API.'}
+                      ? 'Your seller’s machine will generate your creation and send it back.'
+                      : mediaType === 'music'
+                        ? 'Music uses the demo synthesizer in single-server mode. For local AI music, use the seller worker.'
+                        : mode === 'mock'
+                          ? 'Your image uses our local demo compositor.'
+                          : 'Image generation uses the configured live API.'}
                   </p>
                 </div>
                 <span className="demo-badge">
@@ -400,7 +441,7 @@ export function CreateFlow({
               <p className="checkout-note">
                 <ShieldCheck size={13} />
                 {selected.commercialUseAllowed ? 'Commercial use allowed' : 'Personal use only'} ·
-                Downloadable PNG
+                {mediaType === 'music' ? 'Downloadable WAV' : 'Downloadable PNG'}
               </p>
               {!busy && !jobId && (
                 <button className="text-button" onClick={() => setStep(2)}>
@@ -460,7 +501,7 @@ export function CreateFlow({
               </div>
               <div>
                 <Check size={14} />
-                Simple, per-image pricing
+                Simple, per-creation pricing
               </div>
               <div>
                 <Check size={14} />
@@ -471,8 +512,8 @@ export function CreateFlow({
           <div className="aside-footnote">
             <span className="status-dot" />
             {mode === 'worker'
-              ? 'Seller laptop mode · text to image'
-              : mode === 'mock'
+              ? `Seller laptop mode · text to ${mediaType}`
+              : mode === 'mock' || mediaType === 'music'
                 ? 'Demo mode · no API key needed'
                 : 'Live image generation enabled'}
           </div>

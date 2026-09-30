@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { runLocalProcess } from './local-process';
 import { access, readFile, stat, unlink } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { homedir } from 'node:os';
@@ -79,65 +79,7 @@ export async function generateLocalImage(
     outputPath,
   ];
   try {
-    await new Promise<void>((resolve, reject) => {
-      // No shell: buyer text is a single literal argument, never executable code.
-      const child = spawn(config.script, args, {
-        cwd: path.dirname(config.script),
-        shell: false,
-        detached: process.platform !== 'win32',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      let stderr = '';
-      let failure: Error | null = null;
-      let killTimer: ReturnType<typeof setTimeout> | undefined;
-      const kill = (sig: NodeJS.Signals) => {
-        if (!child.pid) return;
-        try {
-          if (process.platform === 'win32') child.kill(sig);
-          else process.kill(-child.pid, sig);
-        } catch {
-          /* Already exited. */
-        }
-      };
-      const stop = (error: Error) => {
-        if (failure) return;
-        failure = error;
-        kill('SIGTERM');
-        killTimer = setTimeout(() => kill('SIGKILL'), 2000);
-      };
-      const abort = () => stop(new Error('Local generation cancelled.'));
-      const timer = setTimeout(
-        () =>
-          stop(
-            new Error(
-              `Local generation timed out after ${Math.round(config.timeoutMs / 1000)} seconds.`,
-            ),
-          ),
-        config.timeoutMs,
-      );
-      const cleanup = () => {
-        clearTimeout(timer);
-        if (killTimer) clearTimeout(killTimer);
-        signal?.removeEventListener('abort', abort);
-      };
-      signal?.addEventListener('abort', abort, { once: true });
-      if (signal?.aborted) abort();
-      child.stdout.on('data', () => {}); // Drain model progress without exposing private recipes.
-      child.stderr.on('data', (data: Buffer) => {
-        stderr = (stderr + data.toString()).slice(-4000);
-      });
-      child.once('error', (error) => {
-        cleanup();
-        reject(error);
-      });
-      child.once('close', (code) => {
-        cleanup();
-        if (failure) reject(failure);
-        else if (code !== 0)
-          reject(new Error(`Generator exited with code ${code}. ${stderr.trim()}`));
-        else resolve();
-      });
-    });
+    await runLocalProcess(config.script, args, config.timeoutMs, signal);
     signal?.throwIfAborted();
     if ((await stat(outputPath)).size > 10 * 1024 * 1024)
       throw new Error('Generator output exceeds 10 MB.');

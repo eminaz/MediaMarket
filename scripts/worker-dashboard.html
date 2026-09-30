@@ -255,14 +255,14 @@
   <body>
     <header>
       <a class="logo" href="/" aria-label="Seller dashboard"><span>✳</span>tastemaker.</a
-      ><span class="label">SELLER MACHINE / MOCK RENDERER</span>
+      ><span class="label">SELLER MACHINE / GENERATION WORKER</span>
     </header>
     <main>
       <div class="top">
         <div>
           <span class="label">YOUR LAPTOP. YOUR CREATIVE STUDIO.</span>
           <h1 id="worker-name">Connecting your studio…</h1>
-          <p>Orders arrive here. Images are composed on this machine.</p>
+          <p>Orders arrive here. Images and music are generated on this machine.</p>
         </div>
         <button id="toggle" disabled>Pause worker</button>
       </div>
@@ -289,23 +289,31 @@
         <aside class="panel">
           <div class="preview">
             <p id="empty">Your next creation<br />will appear here.</p>
+            <audio
+              id="audio-output"
+              controls
+              hidden
+              aria-label="Latest music generated on this seller machine"
+              style="width: 100%"
+            ></audio>
             <img id="output" alt="Latest image generated on this seller machine" hidden />
           </div>
           <div class="caption">
-            <b id="completed">0 images delivered</b><br />PNG saved locally, then uploaded to the
-            marketplace.
+            <b id="completed">0 creations delivered</b><br />PNG or WAV saved locally, then uploaded
+            to the marketplace.
           </div>
         </aside>
       </div>
       <div class="facts">
         <b id="renderer">Connecting to your image renderer…</b><br />The marketplace queues an order
-        → this worker receives the brief and private style recipe → this laptop builds the PNG → the
-        finished image travels back to the buyer. Pausing stops new claims; an active job finishes
-        normally.
+        → this worker receives the brief and private style recipe → this laptop generates the result
+        → the finished creation travels back to the buyer. Pausing stops new claims; an active job
+        finishes normally.
       </div>
       <p class="muted">
-        Marketplace: <a id="marketplace" target="_blank" rel="noopener"></a> · No real USDC
-        transfers. This dashboard runs on the seller’s machine.
+        Marketplace: <a id="marketplace" target="_blank" rel="noopener"></a> · Payments follow the
+        marketplace mode (sandbox test USDC or simulated). This dashboard runs on the seller’s
+        machine.
       </p>
     </main>
     <script>
@@ -320,7 +328,8 @@
           el('renderer').textContent =
             s.generationMode === 'local'
               ? 'Local AI generation · text to image'
-              : 'Mock compositor · no AI model running';
+              : 'Mock image compositor';
+          el('renderer').textContent += ' · Music: ' + s.musicRenderer;
           el('seller').textContent = '@' + s.seller;
           el('connection-text').textContent = s.paused
             ? 'Claims paused'
@@ -338,10 +347,17 @@
           el('brief').textContent =
             s.currentJob?.brief || 'Only paid orders for your seller handle will be claimed.';
           el('completed').textContent =
-            s.completed + ' image' + (s.completed === 1 ? '' : 's') + ' delivered';
+            s.completed + ' creation' + (s.completed === 1 ? '' : 's') + ' delivered';
           if (s.lastOutput && s.lastOutput !== lastOutput) {
-            el('output').src = '/output.png?id=' + encodeURIComponent(s.lastOutput);
-            el('output').hidden = false;
+            const music = s.lastOutputType === 'music';
+            el('output').hidden = music;
+            el('audio-output').hidden = !music;
+            if (music)
+              el('audio-output').src = '/output.wav?id=' + encodeURIComponent(s.lastOutput);
+            else {
+              el('audio-output').pause();
+              el('output').src = '/output.png?id=' + encodeURIComponent(s.lastOutput);
+            }
             el('empty').hidden = true;
             lastOutput = s.lastOutput;
           }

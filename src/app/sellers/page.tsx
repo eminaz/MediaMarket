@@ -38,9 +38,9 @@ export default function SellersPage() {
       <div className="seller-directory-summary">
         <span>
           <strong>{sellers.length}</strong> {sellers.length === 1 ? 'seller' : 'sellers'} ·{' '}
-          <strong>{styles.length}</strong> image styles
+          <strong>{styles.length}</strong> creative styles
         </span>
-        <span>Prices in USDC per image · Ratings across each seller’s styles</span>
+        <span>Prices in USDC per creation · Ratings across each seller’s styles</span>
       </div>
       {sellers.length ? (
         <table className="seller-directory">
@@ -51,7 +51,7 @@ export default function SellersPage() {
             <tr>
               <th scope="col">Seller</th>
               <th scope="col">Overall rating</th>
-              <th scope="col">Price per image</th>
+              <th scope="col">Price per creation</th>
               <th scope="col">Styles & prices</th>
             </tr>
           </thead>
@@ -91,12 +91,12 @@ export default function SellersPage() {
                       View reviews <ArrowUpRight size={14} aria-hidden="true" />
                     </Link>
                   </td>
-                  <td data-label="Price per image">
+                  <td data-label="Price per creation">
                     <div className="directory-price">
                       {low.toFixed(2)}
                       {low !== high && <>–{high.toFixed(2)}</>}
                     </div>
-                    <span className="directory-currency">USDC / image</span>
+                    <span className="directory-currency">USDC / creation</span>
                   </td>
                   <td data-label="Styles & prices">
                     <ul className="directory-styles">
@@ -106,7 +106,12 @@ export default function SellersPage() {
                             <img src={style.sampleImages[0]} alt="" loading="lazy" />
                             <span className="directory-style-name">
                               <strong>{style.name}</strong>
-                              <span>~{style.etaSeconds}s delivery</span>
+                              <span>
+                                {style.type === 'music'
+                                  ? `${style.durationSeconds || 10}s music · `
+                                  : 'Image · '}
+                                ~{style.etaSeconds}s delivery
+                              </span>
                             </span>
                             <span className="directory-style-price">
                               {style.priceUsdc.toFixed(2)} <small>USDC</small>

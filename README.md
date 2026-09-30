@@ -2,7 +2,7 @@
 
 **Agents don’t just buy compute — they buy taste.**
 
-A hackathon MVP marketplace for independent image-generation styles. Sellers package a creative recipe; buyers describe an image in a brief, choose a style (or let a buyer agent choose), pay through pay.sh sandbox (or simulated checkout), and receive a downloadable image.
+A hackathon MVP marketplace for independent image and music generation styles. Sellers package a creative recipe; buyers describe an image or soundtrack in a brief, choose a style (or let a buyer agent choose), pay through pay.sh sandbox (or simulated checkout), and receive a downloadable PNG or WAV.
 
 Built with Next.js App Router, TypeScript, Tailwind CSS, SQLite, and Sharp. No authentication, wallet, API key, or external database is needed for the default demo.
 
@@ -28,7 +28,7 @@ npm start
 ## Single-server simulated demo walkthrough
 
 1. Explore the marketplace; filter by vibe, search a creator, or sort by price and delivery time.
-2. Open **Luxury Product Ad** and click **Use this style**, or start **Create an image**.
+2. Open **Luxury Product Ad** and click **Use this style**, or start **Create something**.
 3. Describe your subject and scene. No input image is needed; new orders are text-to-image.
 4. Enter `A quiet luxury launch for a botanical skincare serum.`, brand `AURA skincare`, budget `5`, and vibes `luxury` and `minimal`.
 5. Click **Find my style**, then **Auto-pick for me**. The buyer agent selects Luxury Product Ad at **2.50 USDC** and explains its decision. You can also select a style manually.
@@ -39,6 +39,41 @@ npm start
 10. On a delivered order, choose 1–5 stars and optionally write a short review. Submit once; the style and seller ratings update for the next buyer.
 
 Saved creations appear in **My creations**, including pending payments and interrupted work. Reloading a job resumes progress; failed jobs can be retried without another payment.
+
+## Music marketplace
+
+Buy and sell **text-to-music** styles alongside images. Open the **Music** tab on the marketplace and select **Luxury Ambient Music** by `@studio.aure`: 2.50 USDC for one 10-second instrumental WAV. Existing databases receive this seed automatically without overwriting your styles or reviews.
+
+- **Seller studio:** choose Music, set a fixed clip duration (5–30 seconds), price per track, ETA, tags, and private musical direction. Cover artwork is optional; it is explicitly artwork, not a generated audio sample. The same seller account, payout address, ratings, and worker handle support image and music listings.
+- **Buyer:** select Music in the creation form (preselected from a music listing), describe mood/instruments/tempo, choose a style or auto-pick, then check out. Price covers the listing's fixed clip duration; delivery ETA is separate. Auto-pick never mixes image and music candidates.
+- **Delivery:** the result page has an audio player and Download music button. WAV responses support byte ranges for seeking. Completed music orders can be reviewed, and feedback contributes to style and seller ratings.
+
+Use the same two commands, with no new env variables required on this laptop:
+
+```sh
+# Buyer terminal
+npm run buyer
+# Seller terminal
+npm run seller
+```
+
+The seller automatically detects `~/Pictures/local-image-gen/music.sh` and executes it with literal `--prompt`, `--duration`, and `--output` arguments. It combines the private recipe with the buyer brief, keeps the lease alive while the model runs, saves a WAV locally, and uploads it. Your T7 drive and the music model environment must be ready, just as when running the script manually. The worker handles one order at a time. If already running, restart the seller process yourself after updating to load music support.
+
+Music configuration is optional in `.env.worker`: `SELLER_MUSIC_GENERATOR=auto|local|mock`, `LOCAL_MUSIC_SCRIPT`, and `LOCAL_MUSIC_TIMEOUT_MS` (default 600000). Music auto-detection is independent from image model configuration; `SELLER_GENERATOR=mock` also mocks music unless explicitly overridden. `npm run dev` single-server music always uses an audible deterministic demo synthesizer; local AI music runs through the seller worker. Missing scripts in auto mode use labeled mock audio. A configured model that fails never silently falls back.
+
+The upload validates PCM16 mono/stereo WAV, clip duration, and file size (max 32 MB). Private metadata chunks and the generator's `.metadata.json` sidecar are stripped/deleted before delivery. Model licensing and the seller's commercial-use permission should agree; the marketplace does not grant model rights.
+
+Buyer agents can discover `GET /api/agent/styles?type=music`, then POST an order with `type: "music"`. The type defaults to image for auto-selection; an explicitly selected listing infers its type unless a conflicting type was supplied. The returned `outputUrl`/`downloadUrl` works for either medium; `outputAudioUrl` is populated for music and the existing `outputImageUrl` remains for images.
+
+```sh
+npm run agent -- "Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, no vocals" --type music --timeout 900 --open
+```
+
+The CLI saves music to `agent-output/<jobId>.wav` and prints `audioPath`, `audioUrl`, `outputPath`, and `outputUrl`. `--open` launches the default media player; `afplay /path/to/track.wav` also works on macOS. Existing image CLI fields remain compatible. From a local Claude session, ask it to read `/agent-guide.md`, order music with a specified budget, and download/play the WAV.
+
+Payments reuse the existing simulated or hosted pay.sh sandbox flow. Browser sandbox checkout still requires the copied Pay CLI command; in-browser wallet payment is not added. Seller generation starts only after the existing payment verification gate passes. Retry/resume the same order if a model takes longer than the agent's wait timeout.
+
+Music checks: `npm test`, `npm run test:e2e`, and `npm run test:worker`. To exercise the real local music model with **simulated checkout**, run `TEST_LOCAL_MUSIC=1 npm run test:worker -- --grep "buyer agent purchases music"`. This starts isolated temporary buyer/seller servers and does not use your running demo processes.
 
 ## Ratings and reviews
 
@@ -316,10 +351,13 @@ src/lib/workers.ts       Seller authentication, atomic claims, leases, and compl
 src/lib/media.ts         Image validation, normalization, local storage
 src/lib/validation.ts    API input validation
 scripts/seed.ts          Optional explicit seed command
-scripts/buyer-agent.ts   HTTP reference client: discover → order → Pay sandbox → download PNG
+scripts/buyer-agent.ts   HTTP reference client: discover → order → Pay sandbox → download PNG/WAV
 src/lib/pay-sandbox.ts   Pay SDK verification, test wallets, and persisted receipts
 scripts/seller-worker.ts Independent seller process and local dashboard server
 scripts/local-generator.ts Safe CLI adapter for a local text-to-image model
+scripts/local-music.ts    Local music.sh adapter, WAV validation and metadata removal
+scripts/local-process.ts Shared process timeout and cancellation handling
+src/lib/audio.ts         WAV validation, metadata stripping and mock music synthesis
 scripts/distributed-demo.ts One-command marketplace + seller worker demo
 tests/                  Agent unit tests and Playwright acceptance tests
 ```
@@ -359,12 +397,12 @@ This generates one real image, verifies delivery through the buyer UI, and saves
 - **Payments use test funds.** Pay sandbox mode performs verified MPP settlement on hosted Surfpool. Simulated mode remains available. Mainnet, production seller wallets, refunds, and reconciliation tooling are not implemented.
 - **No sign-in.** Seller handles, creations, uploads, and job URLs are shared by users of the local instance. Workflow prompts are omitted from public routes, but this is not a secure multi-tenant service.
 - **Persistent local disk is required.** Use a long-running Node process with writable storage. Ephemeral serverless filesystems require a different database, object storage, and a durable worker.
-- Uploads are limited to 10 MB and PNG/JPG/WebP; decoded images are capped at 40 million pixels and normalized to PNG with a maximum dimension of 1600 pixels.
+- Image uploads are limited to 10 MB and PNG/JPG/WebP; decoded images are capped at 40 million pixels and normalized to PNG with a maximum dimension of 1600 pixels.
 - Commercial use is a seller-provided listing label. Buyers remain responsible for the rights to their inputs and final uses.
 
 ## Extending to video
 
-`MediaType` already allows `image | video`. The current picker and checkout only accept image listings. Add a video provider with an asynchronous submit/status interface, duration/aspect-ratio inputs, object storage for larger files, and a video player on the delivery page. Reuse sellers, style recipes, pricing, payment state, and the overall job flow. Production Solana settlement and a durable worker queue can replace sandbox payments and browser-driven local generation independently.
+`MediaType` already allows `image | music | video`. The current picker and checkout accept image and music listings. Add a video provider with an asynchronous submit/status interface, duration/aspect-ratio inputs, object storage for larger files, and a video player on the delivery page. Reuse sellers, style recipes, pricing, payment state, and the overall job flow. Production Solana settlement and a durable worker queue can replace sandbox payments and browser-driven local generation independently.
 
 ## Preview image credits
 

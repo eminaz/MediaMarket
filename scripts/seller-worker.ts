@@ -3,6 +3,8 @@ import { hostname } from 'node:os';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { localMusicConfig, generateLocalMusic } from './local-music';
+import { renderMockMusic } from '../src/lib/audio';
 import { renderMockImage } from '../src/lib/mock-image';
 import type { WorkerAssignment } from '../src/lib/workers';
 import { demoSeller, demoToken } from './demo-defaults';
@@ -22,6 +24,7 @@ const port = Number(process.env.WORKER_PORT || 4001);
 const outputDir = path.resolve(process.env.WORKER_OUTPUT_DIR || 'worker-data');
 const delayMs = Number(process.env.WORKER_DEMO_DELAY_MS || 6000);
 const generator = await localGeneratorConfig();
+const musicGenerator = await localMusicConfig();
 let activeGeneration: AbortController | null = null;
 if (token.length < 16)
   throw new Error(
@@ -51,6 +54,8 @@ const state = {
   generationMode: generator ? 'local' : 'mock',
   currentJob: null as { id: string; style: string; brief: string } | null,
   lastOutput: null as string | null,
+  lastOutputType: 'image' as 'image' | 'music',
+  musicRenderer: musicGenerator ? 'Local music model' : 'Mock synthesizer',
   completed: 0,
   events: [] as { time: string; message: string }[],
 };
@@ -109,10 +114,21 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify({ paused: state.paused }));
     return;
   }
-  if (req.method === 'GET' && pathname === '/output.png' && state.lastOutput) {
+  if (
+    req.method === 'GET' &&
+    pathname === (state.lastOutputType === 'music' ? '/output.wav' : '/output.png') &&
+    state.lastOutput
+  ) {
     try {
-      res.setHeader('Content-Type', 'image/png');
-      res.end(await readFile(path.join(outputDir, `${state.lastOutput}.png`)));
+      res.setHeader('Content-Type', state.lastOutputType === 'music' ? 'audio/wav' : 'image/png');
+      res.end(
+        await readFile(
+          path.join(
+            outputDir,
+            `${state.lastOutput}.${state.lastOutputType === 'music' ? 'wav' : 'png'}`,
+          ),
+        ),
+      );
     } catch {
       res.writeHead(404).end();
     }
@@ -123,6 +139,7 @@ const server = createServer(async (req, res) => {
 server.listen(port, '127.0.0.1', () => {
   log(`Seller dashboard: http://localhost:${port}`);
   log(`Serving @${seller}. Rendering locally on ${hostname()}.`);
+  log(musicGenerator ? 'Local music model enabled.' : 'Music: demo synthesizer (no local model).');
   log(
     generator
       ? `Local model enabled: ${generator.width}×${generator.height}, ${generator.steps} steps, seed ${generator.seed}.`
@@ -136,6 +153,9 @@ server.on('error', (error) => {
 async function work(assignment: WorkerAssignment) {
   const { job, claimToken, workflowPrompt } = assignment;
   const route = `/api/worker/jobs/${job.id}`;
+  const music = job.style.type === 'music';
+  const local = music ? !!musicGenerator : !!generator;
+  const extension = music ? 'wav' : 'png';
   state.currentJob = { id: job.id, style: job.style.name, brief: job.buyerBrief };
   let leaseLost = false;
   let heartbeatBusy = false;
@@ -160,14 +180,34 @@ async function work(assignment: WorkerAssignment) {
       throw new Error(
         'This local model worker supports text-to-image only. Create a new order with a text brief.',
       );
-    state.phase = generator ? 'Generating with local AI' : 'Composing a mock image';
+    state.phase = local
+      ? music
+        ? 'Generating music with local AI'
+        : 'Generating with local AI'
+      : music
+        ? 'Synthesizing demo music'
+        : 'Composing a mock image';
     log(
-      generator
+      local
         ? 'Brief received. Running the local model with the seller’s private style recipe.'
-        : 'Brief received. Composing the image locally in mock mode.',
+        : music
+          ? 'Brief received. Synthesizing demo music locally.'
+          : 'Brief received. Composing the image locally in mock mode.',
     );
     let output: Buffer;
-    if (generator) {
+    if (music) {
+      const duration = job.style.durationSeconds || 10;
+      const prompt = `${workflowPrompt}\nBuyer brief: ${job.buyerBrief}${job.brandName ? `\nProject: ${job.brandName}` : ''}`;
+      output = musicGenerator
+        ? await generateLocalMusic(
+            musicGenerator,
+            prompt,
+            duration,
+            path.join(outputDir, `${job.id}-${randomUUID()}.wav`),
+            activeGeneration.signal,
+          )
+        : renderMockMusic(duration, prompt);
+    } else if (generator) {
       output = await generateLocalImage(
         generator,
         buildGenerationPrompt(workflowPrompt, job.buyerBrief, job.brandName),
@@ -187,16 +227,20 @@ async function work(assignment: WorkerAssignment) {
         styleListing: job.style,
       });
     }
-    await writeFile(path.join(outputDir, `${job.id}.png`), output);
+    await writeFile(path.join(outputDir, `${job.id}.${extension}`), output);
     if (leaseLost)
       throw new Error(
         'Connection was interrupted; output is saved locally, and the job can be reclaimed.',
       );
     state.phase = 'Uploading result';
-    log('PNG rendered on this machine. Uploading the finished image…');
+    log(`${extension.toUpperCase()} rendered on this machine. Uploading the finished creation…`);
     const form = new FormData();
-    form.set('generationMode', generator ? 'local' : 'mock');
-    form.set('image', new Blob([new Uint8Array(output)], { type: 'image/png' }), 'output.png');
+    form.set('generationMode', local ? 'local' : 'mock');
+    form.set(
+      music ? 'audio' : 'image',
+      new Blob([new Uint8Array(output)], { type: music ? 'audio/wav' : 'image/png' }),
+      `output.${extension}`,
+    );
     // Completion is idempotent, so a lost response can be retried without a second delivery.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -209,7 +253,8 @@ async function work(assignment: WorkerAssignment) {
     }
     state.completed++;
     state.lastOutput = job.id;
-    log(`Delivered ${job.id.slice(0, 8)}. The buyer can now download the image.`);
+    state.lastOutputType = music ? 'music' : 'image';
+    log(`Delivered ${job.id.slice(0, 8)}. The buyer can now download the creation.`);
   } catch (error) {
     log(`Job interrupted: ${(error as Error).message}`);
     await request(`${route}/fail`, { method: 'POST' }, claimToken).catch(() => {});

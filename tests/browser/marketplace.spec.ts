@@ -246,7 +246,7 @@ test('seller directory compares all sellers, their aggregated ratings and style 
   await expect(navigation.getByRole('link', { name: 'Seller studio' })).not.toHaveClass(/active/);
   await expect(page.locator('.seller-directory tbody tr')).toHaveCount(expectedSellers.size);
   const aure = page.locator('[data-seller="studio.aure"]');
-  await expect(aure).toContainText('2 styles');
+  await expect(aure).toContainText('3 styles');
   await expect(aure.locator('.directory-price')).toHaveText('2.00–2.50');
   const seller = styles.find(
     (style: { sellerId: string }) => style.sellerId === 'studio.aure',
@@ -256,7 +256,7 @@ test('seller directory compares all sellers, their aggregated ratings and style 
       ? `${seller.averageRating.toFixed(1)} stars · ${seller.reviewCount} ${seller.reviewCount === 1 ? 'review' : 'reviews'}`
       : 'No reviews yet',
   );
-  await expect(aure.locator('.directory-styles').getByRole('link')).toHaveCount(2);
+  await expect(aure.locator('.directory-styles').getByRole('link')).toHaveCount(3);
   await expect(page.locator('[data-seller="offgrid"] .rating-summary')).toHaveText(
     'No reviews yet',
   );
@@ -338,4 +338,72 @@ test('seller reviews combine comments across styles and link back to each listin
   await page.goto('/sellers/missing-seller');
   // Next.js streamed responses can keep HTTP 200 while rendering notFound().
   await expect(page.getByRole('heading', { name: 'A little off the canvas.' })).toBeVisible();
+});
+
+test('music marketplace, auto-pick, checkout, WAV playback, review and seller publishing', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+  await page
+    .getByRole('group', { name: 'Media type' })
+    .getByRole('button', { name: 'Music', exact: true })
+    .click();
+  await expect(page.locator('.style-card')).toHaveCount(1);
+  await page.locator('.style-card').click();
+  await expect(page.getByText('per 10s track · one-time payment')).toBeVisible();
+  await page.getByRole('link', { name: 'Use this style' }).click();
+  await expect(page.getByLabel('What would you like to create?')).toHaveValue('music');
+  await page.getByLabel('The brief').fill('Warm piano, minimal luxury ambient music, no vocals');
+  await page.getByRole('button', { name: 'Find my style', exact: true }).click();
+  await page.getByRole('button', { name: 'Auto-pick for me' }).click();
+  await expect(page.locator('.style-option.selected')).toContainText('Luxury Ambient Music');
+  await page.getByRole('button', { name: 'Review creation' }).click();
+  await page.getByRole('button', { name: 'Pay 2.50 USDC & create' }).click();
+  await expect(page.getByRole('heading', { name: 'Your soundtrack is ready.' })).toBeVisible({
+    timeout: 30_000,
+  });
+  const audio = page.getByLabel('Generated music', { exact: true });
+  await expect.poll(() => audio.evaluate((el: HTMLAudioElement) => el.duration)).toBe(10);
+  await audio.evaluate((el: HTMLAudioElement) => el.play());
+  await expect
+    .poll(() => audio.evaluate((el: HTMLAudioElement) => el.currentTime))
+    .toBeGreaterThan(0);
+  await audio.evaluate((el: HTMLAudioElement) => el.pause());
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download music' }).click();
+  expect((await downloadPromise).suggestedFilename()).toBe('tastemaker-creation.wav');
+  await page.getByRole('radio', { name: '4 stars', exact: true }).check();
+  await page.getByLabel('A short review').fill('A gentle soundtrack for our perfume launch.');
+  await page.getByRole('button', { name: 'Submit review', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your review', exact: true })).toBeVisible();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.screenshot({ path: 'test-results/music-delivered.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  await page.goto('/sell');
+  await page.getByRole('combobox', { name: 'Media type', exact: true }).selectOption('music');
+  await page.getByLabel('Style name', { exact: true }).fill('Warm acoustic music');
+  await page.getByLabel('Seller handle', { exact: true }).fill('music.studio');
+  await page
+    .getByLabel('Describe your style', { exact: true })
+    .fill('Gentle acoustic guitar and warm textures for thoughtful brand films.');
+  await page.getByLabel('Tags', { exact: false }).fill('acoustic, warm');
+  await page.getByLabel('Track duration', { exact: false }).fill('15');
+  await page.getByLabel('Price per track', { exact: false }).fill('3.75');
+  await page
+    .getByLabel('Internal workflow prompt', { exact: true })
+    .fill('Private music recipe: intimate fingerpicked guitar with soft pads.');
+  await page.getByRole('button', { name: 'Publish your style' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Warm acoustic music', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('per 15s track · one-time payment')).toBeVisible();
+  const styles = await (await request.get('/api/styles')).json();
+  const published = styles.find((s: { name: string }) => s.name === 'Warm acoustic music');
+  expect(published.type).toBe('music');
+  expect(published.priceUsdc).toBe(3.75);
+  expect(JSON.stringify(published)).not.toContain('Private music recipe');
 });

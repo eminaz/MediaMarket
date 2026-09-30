@@ -4,7 +4,7 @@ export async function GET() {
   return Response.json({
     name: 'Tastemaker',
     version: '1',
-    capability: 'text-to-image marketplace',
+    capability: 'text-to-image and text-to-music marketplace',
     guide: '/agent-guide.md',
     authentication: 'None in this hackathon demo. Orders and results are shared.',
     paymentMode: mode,
@@ -17,7 +17,7 @@ export async function GET() {
         method: 'GET',
         path: '/api/agent/styles?budget=5&tags=luxury',
         purpose:
-          'Discover eligible styles, sellers, prices, ETAs, averageRating and reviewCount. Filters are optional.',
+          'Discover eligible styles, sellers, prices, ETAs, averageRating and reviewCount. Filters are optional; type=image or type=music restricts media type.',
       },
       {
         method: 'POST',
@@ -29,7 +29,7 @@ export async function GET() {
           payment: mode,
         },
         purpose:
-          'Auto-select a style and create an order. For pay-sandbox, call paymentUrl with pay --sandbox curl -X POST before generation. Optional: desiredTags, brandName, styleListingId. budget is a hard maximum in USDC.',
+          'Auto-select a style and create an order. For pay-sandbox, call paymentUrl with pay --sandbox curl -X POST before generation. Optional: type (image or music; defaults to image for auto-selection), desiredTags, brandName, styleListingId. Music durationSeconds is fixed by the listing; price is per track. budget is a hard maximum in USDC.',
       },
       {
         method: 'GET',
@@ -41,7 +41,7 @@ export async function GET() {
         method: 'GET',
         path: '{downloadUrl}',
         purpose:
-          'Download the PNG to the buyer laptop and display it. viewUrl opens the marketplace result page.',
+          'Download the PNG image or WAV music track to the buyer laptop and display/play it. viewUrl opens the marketplace result page.',
       },
     ],
     reviews: {

@@ -64,12 +64,15 @@ export function db() {
         tags: seed.tags,
         priceUsdc: seed.priceUsdc,
         etaSeconds: seed.etaSeconds,
-        type: 'image',
+        type: seed.type || 'image',
+        ...(seed.type === 'music' ? { durationSeconds: seed.durationSeconds } : {}),
         sampleImages: [`/samples/${seed.sample}`],
         publicPromptSummary: seed.summary,
         hiddenWorkflowPrompt: seed.prompt,
         inputRequirements:
-          'A short text brief describing your subject, scene, and desired mood. No input image needed.',
+          seed.type === 'music'
+            ? 'A short text brief describing mood, instruments, tempo, and intended use. Delivers a 10-second instrumental track.'
+            : 'A short text brief describing your subject, scene, and desired mood. No input image needed.',
         commercialUseAllowed: true,
         createdAt: now,
         palette: seed.palette,

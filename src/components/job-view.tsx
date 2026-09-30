@@ -24,6 +24,8 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
   const [error, setError] = useState('');
   const [paying, setPaying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const music = job.style.type === 'music';
+  const outputUrl = job.outputAudioUrl || job.outputImageUrl;
   const sandbox = job.paymentMode === 'pay-sandbox';
   const advancing = useRef(false);
   const done = job.status === 'delivered';
@@ -147,34 +149,41 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
       )}
       <div className="job-grid">
         <section className="result-panel">
-          {done && job.outputImageUrl ? (
+          {done && outputUrl ? (
             <>
-              <div className="result-image">
-                <img
-                  src={job.outputImageUrl}
-                  alt={`Generated ${job.style.name} image for ${job.brandName || 'your brief'}`}
-                />
-              </div>
+              {music ? (
+                <div className="result-audio">
+                  <StyleArtwork style={job.style} />
+                  <h2>Your soundtrack is ready.</h2>
+                  <audio controls preload="metadata" src={outputUrl} aria-label="Generated music" />
+                  <p>{job.style.durationSeconds || 10}-second track · WAV</p>
+                </div>
+              ) : (
+                <div className="result-image">
+                  <img
+                    src={outputUrl}
+                    alt={`Generated ${job.style.name} image for ${job.brandName || 'your brief'}`}
+                  />
+                </div>
+              )}
               <div className="result-toolbar">
                 <div>
                   <CheckCircle2 size={18} />
                   <span>
                     Your creation, ready to go.
                     <small>
-                      {job.generationMode === 'mock'
-                        ? 'Demo composition · 1024 × 1280 PNG'
-                        : job.generationMode === 'local'
-                          ? 'Local AI generation · PNG'
-                          : 'AI-generated image · PNG'}
+                      {music
+                        ? `${job.generationMode === 'local' ? 'Local AI music' : 'Demo synthesized audio'} · WAV`
+                        : job.generationMode === 'mock'
+                          ? 'Demo composition · 1024 × 1280 PNG'
+                          : job.generationMode === 'local'
+                            ? 'Local AI generation · PNG'
+                            : 'AI-generated image · PNG'}
                     </small>
                   </span>
                 </div>
-                <a
-                  className="button button-dark"
-                  href={`${job.outputImageUrl}?download=1`}
-                  download
-                >
-                  Download image <Download size={16} />
+                <a className="button button-dark" href={`${outputUrl}?download=1`} download>
+                  {music ? 'Download music' : 'Download image'} <Download size={16} />
                 </a>
               </div>
             </>
@@ -338,7 +347,9 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                 </span>
               </div>
             )}
-            <label>{job.inputImageUrl ? 'THE BRIEF' : 'TEXT TO IMAGE'}</label>
+            <label>
+              {job.inputImageUrl ? 'THE BRIEF' : music ? 'TEXT TO MUSIC' : 'TEXT TO IMAGE'}
+            </label>
             <p>{job.buyerBrief}</p>
             {job.requestSource === 'agent' && (
               <p className="mode-note">
@@ -372,9 +383,13 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
               </div>
             )}
             <div className="mode-note">
-              {job.generationMode === 'mock'
-                ? `${job.executionMode === 'worker' ? 'Composed on the seller’s machine and delivered over HTTP.' : 'Made with our local demo compositor.'} A deterministic demo poster using your brief and style palette; no AI model was used.`
-                : 'Signature style. One image at a time.'}
+              {music
+                ? job.generationMode === 'mock'
+                  ? 'Demo synthesized audio. No AI music model was used.'
+                  : 'Generated with the seller’s local music model.'
+                : job.generationMode === 'mock'
+                  ? `${job.executionMode === 'worker' ? 'Composed on the seller’s machine and delivered over HTTP.' : 'Made with our local demo compositor.'} A deterministic demo poster using your brief and style palette; no AI model was used.`
+                  : 'Signature style. One image at a time.'}
             </div>
           </div>
           {done && (

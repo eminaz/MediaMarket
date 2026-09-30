@@ -1,6 +1,6 @@
-# Tastemaker: generate an image for your user
+# Tastemaker: generate images or music for your user
 
-Use this marketplace to buy a seller's creative style and receive a PNG. A seller worker generates the image on its own machine and uploads it. Your agent downloads it to your user's laptop and displays it, or returns the result-page link. You need HTTP access and a sandbox-capable Pay client, but no repository checkout or seller credentials.
+Use this marketplace to buy a seller's creative style and receive a PNG image or WAV music clip. A seller worker generates the creation on its own machine and uploads it. Your agent downloads it to your user's laptop and displays or plays it, or returns the result-page link. You need HTTP access and a sandbox-capable Pay client, but no repository checkout or seller credentials.
 
 The MVP has no authentication. Read `GET /api/agent` to find `paymentMode`: **pay-sandbox** uses the actual pay.sh HTTP 402 / MPP flow with test USDC on hosted Surfpool; **simulated** is the offline fallback. Neither mode uses mainnet funds. Obtain the user’s brief and spending limit; `budget` is a hard price ceiling. The reference CLI defaults to 5 USDC.
 
@@ -49,7 +49,7 @@ An HTTP error never authorizes generation or falls back to mock payment. Check s
 1. Resolve returned relative URLs against the marketplace origin used for your request.
 2. GET `statusUrl` every `pollAfterMs` (normally 2000). States: `queued`, `generating`, `delivered`, `failed`.
 3. In worker mode, the seller acts independently; no buyer page needs to be open. If `advanceUrl` is non-null, this is single-server mode: POST it between polls to drive that demo renderer (allow up to 180 seconds for a generation call).
-4. On delivery, GET `downloadUrl`, save the PNG on your user's device, and display it with your agent's image/file capability. If your agent runs in the cloud, return its downloadable attachment or the marketplace `viewUrl` instead of claiming it was saved on the laptop. `generationMode` identifies `local` AI, `mock` composition, or `openai` API output.
+4. On delivery, GET `downloadUrl`, save the PNG image or WAV audio on your user's device, and display it with your agent's image/file capability. If your agent runs in the cloud, return its downloadable attachment or the marketplace `viewUrl` instead of claiming it was saved on the laptop. `generationMode` identifies `local` AI, `mock` composition, or `openai` API output.
 5. On failure, report `error`. To retry the same paid order, POST `retryUrl` and resume polling. Do not create another order automatically. If waiting times out or a connection drops, keep the job ID and resume later; an offline seller can leave a job queued indefinitely.
 
 All job URLs and files are public in this hackathon instance. Private recipes and worker claim tokens are not returned by buyer endpoints. Mainnet payments and production buyer authorization are not enabled.
@@ -69,3 +69,17 @@ npm run agent -- "A luxury skincare bottle in soft morning light" --open
 ```
 
 This deterministic HTTP client discovers styles, orders, invokes `pay --sandbox` when required, polls, downloads to `agent-output/`, and opens the PNG using the laptop's image viewer. No LLM or browser automation is bundled. For machine-readable output, use `npm run --silent agent -- "your prompt"`: progress goes to stderr and the final result is JSON on stdout. Run `npm run agent -- --help` for options. An external LLM agent can implement these HTTP calls directly.
+
+## Music orders
+
+Discover `GET /api/agent/styles?type=music&budget=5`. Music listings have `type: "music"` and `durationSeconds` (5–30 seconds). The seller's listed price covers one track of that fixed duration. Send `type: "music"` when auto-selecting; omitted type defaults to image. Explicit style selection infers its type if omitted and rejects a conflicting type.
+
+Example order body: `{ "prompt": "Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, no vocals", "type": "music", "budget": 5, "payment": "pay-sandbox" }`. Use the payment mode from the manifest. Settlement, polling, retries, ratings, and seller payout verification work the same as image orders.
+
+Delivered music orders expose `outputAudioUrl`, `outputUrl`, and `downloadUrl`; `outputImageUrl` stays null. Save `.wav`, then open with a local audio player (on macOS, `afplay /path/to/track.wav` plays it). Do not interpret the cover artwork as generated audio or claim playback on a remote user's laptop.
+
+```sh
+npm run agent -- "Minimal luxury ambient music, warm piano, no vocals" --type music --timeout 900 --open
+```
+
+The seller worker auto-detects `~/Pictures/local-image-gen/music.sh` and invokes `--prompt`, `--duration`, `--output`. Single-server mode uses clearly labeled synthesized demo audio; a configured local model failure does not fall back to mock. Generation can take longer than clip duration—resume a saved order rather than buying again.

@@ -1,4 +1,4 @@
-export type MediaType = 'image' | 'video';
+export type MediaType = 'image' | 'music' | 'video';
 export type RatingSummary = { averageRating: number | null; reviewCount: number };
 export type Review = {
   id: string;
@@ -41,6 +41,7 @@ export type StyleListing = RatingSummary & {
   priceUsdc: number;
   etaSeconds: number;
   type: MediaType;
+  durationSeconds?: number;
   sampleImages: string[];
   publicPromptSummary: string;
   inputRequirements: string;
@@ -79,6 +80,7 @@ export type GenerationJob = {
   paymentConfirmedAt: string | null;
   priceUsdc: number;
   outputImageUrl: string | null;
+  outputAudioUrl?: string | null;
   generationMode: string | null;
   executionMode?: 'local' | 'worker';
   workerName?: string | null;

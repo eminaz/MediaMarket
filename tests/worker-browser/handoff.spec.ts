@@ -76,7 +76,7 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
     expect(await (await request.get(job.outputImageUrl)).body()).not.toHaveLength(0);
     const dashboard = await context.newPage();
     await dashboard.goto('http://127.0.0.1:4102');
-    await expect(dashboard.getByText('1 image delivered', { exact: true })).toBeVisible();
+    await expect(dashboard.getByText('1 creation delivered', { exact: true })).toBeVisible();
     await expect(
       dashboard.getByAltText('Latest image generated on this seller machine'),
     ).toBeVisible();
@@ -104,7 +104,7 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
     await expect(dashboard.getByText('Paused', { exact: true })).toBeVisible();
     expect((await (await request.get(`/api/jobs/${second.id}`)).json()).status).toBe('queued');
     await dashboard.getByRole('button', { name: 'Resume worker' }).click();
-    await expect(dashboard.getByText('2 images delivered', { exact: true })).toBeVisible({
+    await expect(dashboard.getByText('2 creations delivered', { exact: true })).toBeVisible({
       timeout: 20_000,
     });
     await dashboard.screenshot({

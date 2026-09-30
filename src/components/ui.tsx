@@ -91,7 +91,14 @@ export function StyleArtwork({
   style: StyleListing;
   className?: string;
 }) {
-  const copy = words[style.palette] || words.luxury;
+  const copy =
+    style.type === 'music'
+      ? {
+          eyebrow: 'SIGNATURE SOUND / ' + style.durationSeconds + ' SECONDS',
+          title: 'Set the\nmood.',
+          sub: 'MUSIC · MADE FOR YOUR MOMENT',
+        }
+      : words[style.palette] || words.luxury;
   const custom = style.sampleImages[0]?.startsWith('/api/');
   return (
     <div className={`artwork art-${style.palette} ${className}`}>
@@ -133,7 +140,7 @@ export function StyleCard({ style }: { style: StyleListing }) {
       <div className="card-body">
         <div className="card-title-row">
           <h3>{style.name}</h3>
-          <span className="media-label">IMAGE</span>
+          <span className="media-label">{style.type.toUpperCase()}</span>
         </div>
         <div className="seller-line">
           <Avatar handle={style.seller.handle} />

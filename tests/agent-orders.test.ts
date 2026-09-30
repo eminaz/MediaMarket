@@ -35,7 +35,7 @@ after(() => {
 
 test('agent discovers only eligible public styles with budget and tag filtering', async () => {
   const response = await discover(
-    new Request('http://localhost/api/agent/styles?budget=2.5&tags=luxury'),
+    new Request('http://localhost/api/agent/styles?budget=2.5&tags=luxury&type=image'),
   );
   const body = await response.json();
   assert.deepEqual(

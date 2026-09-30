@@ -139,7 +139,7 @@ export function finishWorkerJob(
   handle: string,
   id: string,
   token: string,
-  outputImageUrl: string,
+  outputUrl: string,
   generationMode: 'mock' | 'local' = 'mock',
 ) {
   // Re-check after image processing; an old laptop must never overwrite a new claim.
@@ -149,7 +149,9 @@ export function finishWorkerJob(
     ...job,
     status: 'delivered',
     generationMode,
-    outputImageUrl,
+    ...(getStyle(job.styleListingId)?.type === 'music'
+      ? { outputAudioUrl: outputUrl }
+      : { outputImageUrl: outputUrl }),
     error: null,
     updatedAt: new Date().toISOString(),
   });

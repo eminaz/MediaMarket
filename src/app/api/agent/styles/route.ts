@@ -5,6 +5,10 @@ import { apiError } from '@/lib/validation';
 export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
+    const type = z
+      .enum(['image', 'music'])
+      .optional()
+      .parse(params.get('type') ?? undefined);
     const budget = z.coerce
       .number()
       .finite()
@@ -19,6 +23,7 @@ export async function GET(request: Request) {
       .filter(Boolean);
     const styles = orderableStyles().filter(
       (style) =>
+        (!type || style.type === type) &&
         style.priceUsdc <= budget &&
         (!query ||
           `${style.name} ${style.description} ${style.seller.handle} ${style.tags.join(' ')}`

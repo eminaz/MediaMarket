@@ -5,13 +5,17 @@ import { apiError, tagsSchema } from '@/lib/validation';
 import { executionMode, sellerHasWorker } from '@/lib/workers';
 export async function POST(request: Request) {
   try {
-    const { budget, desiredTags } = z
-      .object({ budget: z.number().finite().positive().max(10000), desiredTags: tagsSchema })
+    const { budget, desiredTags, type } = z
+      .object({
+        budget: z.number().finite().positive().max(10000),
+        desiredTags: tagsSchema,
+        type: z.enum(['image', 'music']).default('image'),
+      })
       .parse(await request.json());
     const available = getStyles().filter(
       (style) => executionMode() === 'local' || sellerHasWorker(style.seller.handle),
     );
-    const pick = pickStyle(available, budget, desiredTags);
+    const pick = pickStyle(available, budget, desiredTags, type);
     if (!pick)
       return Response.json(
         {

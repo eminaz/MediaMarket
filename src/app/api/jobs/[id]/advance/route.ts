@@ -1,5 +1,5 @@
 import { db, getJob, getPrivateStyle, saveJob } from '@/lib/db';
-import { generateImage } from '@/lib/generation';
+import { generateMedia } from '@/lib/generation';
 import { paymentReady } from '@/lib/payment-mode';
 export const maxDuration = 180;
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -38,7 +38,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!result.changes) return Response.json(getJob(job.id));
   try {
     const style = getPrivateStyle(job.styleListingId)!;
-    const output = await generateImage({
+    const output = await generateMedia({
       inputImage: job.inputImageUrl,
       buyerBrief: job.buyerBrief,
       brandName: job.brandName,

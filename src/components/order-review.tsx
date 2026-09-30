@@ -66,7 +66,7 @@ export function OrderReview({
         <form onSubmit={submit}>
           <h3>How was this style?</h3>
           <p className="mode-note">
-            Your image is delivered. Help the next buyer find their style.
+            Your creation is delivered. Help the next buyer find their style.
           </p>
           <fieldset className="star-picker" disabled={busy}>
             <legend>Rate this style</legend>

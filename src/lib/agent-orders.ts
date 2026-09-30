@@ -15,6 +15,7 @@ export const agentOrderSchema = z.object({
   brandName: jobSchema.shape.brandName,
   styleListingId: z.string().min(1).optional(),
   payment: z.enum(['simulated', 'pay-sandbox']),
+  type: z.enum(['image', 'music']).optional(),
 });
 export class AgentOrderError extends Error {
   constructor(
@@ -71,9 +72,13 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
         `This marketplace requires payment: "${paymentMode()}". Check GET /api/agent before ordering.`,
         400,
       );
-    const styles = orderableStyles();
+    const type =
+      input.type ||
+      (input.styleListingId ? getStyle(input.styleListingId)?.type : 'image') ||
+      'image';
+    const styles = orderableStyles().filter((style) => style.type === type);
     const tags = input.desiredTags.length ? input.desiredTags : inferTags(input.prompt, styles);
-    const pick = pickStyle(styles, input.budget, tags);
+    const pick = pickStyle(styles, input.budget, tags, type === 'music' ? 'music' : 'image');
     const style = input.styleListingId
       ? styles.find((style) => style.id === input.styleListingId)
       : pick?.style;
@@ -114,6 +119,7 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
 
 export function agentOrderView(job: GenerationJob) {
   const review = getOrderReview(job.id);
+  const outputUrl = job.outputAudioUrl || job.outputImageUrl;
   return {
     review,
     reviewUrl: job.status === 'delivered' && !review ? `/api/jobs/${job.id}/review` : null,
@@ -137,7 +143,9 @@ export function agentOrderView(job: GenerationJob) {
     statusUrl: `/api/agent/orders/${job.id}`,
     viewUrl: `/jobs/${job.id}`,
     outputImageUrl: job.outputImageUrl,
-    downloadUrl: job.outputImageUrl ? `${job.outputImageUrl}?download=1` : null,
+    outputAudioUrl: job.outputAudioUrl || null,
+    outputUrl,
+    downloadUrl: outputUrl ? `${outputUrl}?download=1` : null,
     advanceUrl: job.executionMode === 'worker' ? null : `/api/jobs/${job.id}/advance`,
     retryUrl: job.status === 'failed' ? `/api/jobs/${job.id}/retry` : null,
     pollAfterMs: job.status === 'delivered' || job.status === 'failed' ? null : 2000,

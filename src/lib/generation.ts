@@ -1,6 +1,7 @@
 import { renderMockImage } from './mock-image';
 import { readImage, saveMedia } from './media';
 import type { PrivateStyleListing } from './types';
+import { renderMockMusic } from './audio';
 
 type GenerationInput = {
   inputImage: string | null;
@@ -70,7 +71,14 @@ export const openaiProvider: ImageProvider = {
     return Buffer.from(result.data[0].b64_json, 'base64');
   },
 };
-export async function generateImage(input: GenerationInput) {
+export async function generateMedia(input: GenerationInput) {
+  if (input.styleListing.type === 'music') {
+    const buffer = renderMockMusic(
+      input.styleListing.durationSeconds || 10,
+      input.buyerBrief + input.styleListing.hiddenWorkflowPrompt,
+    );
+    return { outputAudioUrl: await saveMedia(buffer, 'wav'), generationMode: 'mock' };
+  }
   const mode = generationMode();
   const buffer = await (mode === 'openai' ? openaiProvider : mockProvider).generateImage(input);
   return { outputImageUrl: await saveMedia(buffer), generationMode: mode };

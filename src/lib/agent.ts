@@ -1,9 +1,14 @@
 import type { StyleListing } from './types';
 import { ratingScore } from './ratings';
-export function pickStyle(styles: StyleListing[], budget: number, requested: string[]) {
+export function pickStyle(
+  styles: StyleListing[],
+  budget: number,
+  requested: string[],
+  type: 'image' | 'music' = 'image',
+) {
   const tags = [...new Set(requested.map((t) => t.trim().toLowerCase()).filter(Boolean))];
   const ranked = styles
-    .filter((s) => s.type === 'image' && s.priceUsdc <= budget)
+    .filter((s) => s.type === type && s.priceUsdc <= budget)
     .map((style) => ({
       style,
       matches: tags.filter((t) => style.tags.some((s) => s.toLowerCase() === t)),

@@ -3,6 +3,16 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { dataDir, db } from './db';
+import { cleanWav, MAX_AUDIO_BYTES } from './audio';
+
+export async function saveAudioUpload(file: File, durationSeconds: number) {
+  if (
+    !['audio/wav', 'audio/x-wav', 'audio/wave'].includes(file.type) ||
+    file.size > MAX_AUDIO_BYTES
+  )
+    throw new Error('A WAV output up to 32 MB is required.');
+  return saveMedia(cleanWav(Buffer.from(await file.arrayBuffer()), durationSeconds), 'wav');
+}
 
 export async function saveUpload(file: File) {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
@@ -20,9 +30,9 @@ export async function saveUpload(file: File) {
     .toBuffer();
   return saveMedia(buffer);
 }
-export async function saveMedia(buffer: Buffer) {
+export async function saveMedia(buffer: Buffer, extension: 'png' | 'wav' = 'png') {
   db();
-  const name = `${randomUUID()}.png`;
+  const name = `${randomUUID()}.${extension}`;
   await writeFile(path.join(dataDir, 'media', name), buffer);
   return `/api/media/${name}`;
 }

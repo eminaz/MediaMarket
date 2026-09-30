@@ -4004,6 +4004,29 @@ button {
   background: #fff;
   min-width: 0;
 }
+.media-tabs {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+.result-audio {
+  padding: 28px;
+  text-align: center;
+}
+.result-audio .artwork {
+  max-width: 280px;
+  height: 300px;
+  margin: 0 auto 24px;
+  border-radius: 10px;
+}
+.result-audio audio {
+  width: 100%;
+  margin: 20px 0;
+}
+.result-audio p {
+  color: var(--muted);
+  font-size: 13px;
+}
 .directory-reviews-link {
   margin-top: 12px;
 }

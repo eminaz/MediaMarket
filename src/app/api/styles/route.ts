@@ -27,7 +27,6 @@ export async function POST(request: Request) {
       id,
       sellerId: seller.id,
       seller,
-      type: 'image' as const,
       createdAt: new Date().toISOString(),
       featured: false,
     };
