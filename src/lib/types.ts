@@ -1,0 +1,48 @@
+export type MediaType = 'image' | 'video';
+export type Seller = {
+  id: string;
+  handle: string;
+  displayName: string;
+  bio: string;
+  avatarUrl: string;
+};
+export type StyleListing = {
+  id: string;
+  sellerId: string;
+  seller: Seller;
+  name: string;
+  description: string;
+  tags: string[];
+  priceUsdc: number;
+  etaSeconds: number;
+  type: MediaType;
+  sampleImages: string[];
+  publicPromptSummary: string;
+  inputRequirements: string;
+  commercialUseAllowed: boolean;
+  createdAt: string;
+  palette: string;
+  featured: boolean;
+};
+export type PrivateStyleListing = StyleListing & { hiddenWorkflowPrompt: string };
+export type GenerationJob = {
+  id: string;
+  styleListingId: string;
+  inputImageUrl: string;
+  buyerBrief: string;
+  brandName: string;
+  budget: number;
+  desiredTags: string[];
+  status: 'queued' | 'generating' | 'delivered' | 'failed';
+  selectedByAgent: boolean;
+  decisionReason: string;
+  paymentStatus: 'pending' | 'confirmed';
+  paymentConfirmedAt: string | null;
+  priceUsdc: number;
+  outputImageUrl: string | null;
+  generationMode: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type JobWithStyle = GenerationJob & { style: StyleListing };
