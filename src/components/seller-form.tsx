@@ -156,7 +156,7 @@ export function SellerForm() {
               minLength={5}
               maxLength={500}
               rows={2}
-              defaultValue="One product or subject image (PNG, JPG, or WebP) and a short creative brief."
+              defaultValue="A short text brief describing the subject, scene, and desired mood."
             />
           </label>
           <label className="field">
@@ -180,7 +180,8 @@ export function SellerForm() {
               <span>PRIVATE</span>
             </div>
             <p>
-              Your internal workflow stays on the server. Buyers see your style, never this recipe.
+              Shared only with the generation backend and your authenticated worker. Hidden from
+              buyers.
             </p>
             <label className="field">
               Internal workflow prompt
@@ -190,7 +191,7 @@ export function SellerForm() {
                 minLength={15}
                 maxLength={4000}
                 rows={6}
-                placeholder="Describe your art direction, composition rules, lighting, textures, typography, and how to incorporate the buyer’s input image…"
+                placeholder="Describe your art direction, composition rules, lighting, textures, typography, and how to interpret the buyer’s text brief…"
               />
             </label>
           </div>

@@ -2,7 +2,7 @@
 
 **Agents don’t just buy compute — they buy taste.**
 
-A hackathon MVP marketplace for independent image-generation styles. Sellers package a creative recipe; buyers bring an image and a brief, choose a style (or let a buyer agent choose), pay simulated USDC, and receive a downloadable image.
+A hackathon MVP marketplace for independent image-generation styles. Sellers package a creative recipe; buyers describe an image in a brief, choose a style (or let a buyer agent choose), pay simulated USDC, and receive a downloadable image.
 
 Built with Next.js App Router, TypeScript, Tailwind CSS, SQLite, and Sharp. No authentication, wallet, API key, or external database is needed for the default demo.
 
@@ -29,19 +29,19 @@ npm start
 
 1. Explore the marketplace; filter by vibe, search a creator, or sort by price and delivery time.
 2. Open **Luxury Product Ad** and click **Use this style**, or start **Create an image**.
-3. Upload a PNG, JPG, or WebP, or choose **Try our sample product**.
+3. Describe your subject and scene. No input image is needed; new orders are text-to-image.
 4. Enter `A quiet luxury launch for a botanical skincare serum.`, brand `AURA skincare`, budget `5`, and vibes `luxury` and `minimal`.
 5. Click **Find my style**, then **Auto-pick for me**. The buyer agent selects Luxury Product Ad at **2.50 USDC** and explains its decision. You can also select a style manually.
 6. Review the order and click **Pay 2.50 USDC & create**. Payment visibly progresses from pending to confirmed. No real funds move.
 7. Watch **queued → generating → delivered**. Local mock delivery takes roughly 7–10 seconds; listing ETAs represent the intended creative service and live API latency varies.
-8. Compare the original input, selected style, and output. Download the PNG or create another image.
+8. Compare the brief, selected style, and output. Download the PNG or create another image.
 9. Visit **Seller studio** to publish a new style, upload 1–3 examples, choose pricing and a fallback palette, and enter a private workflow prompt.
 
 Saved creations appear in **My creations**, including pending payments and interrupted work. Reloading a job resumes progress; failed jobs can be retried without another payment.
 
 ## Seller laptop demo
 
-The marketplace can hand orders to a **separate seller worker over HTTP**. The worker downloads the input, renders the mock PNG on its own machine, saves a local copy, and uploads the result. It has no access to the marketplace database or filesystem. Image generation and payment remain mocked; the network transfer and seller-side execution are real.
+The marketplace can hand orders to a **separate seller worker over HTTP**. The worker receives the text brief and its seller’s private style recipe, generates a PNG on its own machine, saves a local copy, and uploads the result. It has no access to the marketplace database or filesystem. The seller can run a **real local AI model** or the mock compositor. Payment remains simulated.
 
 ### Quick demo on one laptop
 
@@ -57,7 +57,7 @@ npm run buyer
 npm run seller
 ```
 
-The seller handle, matching demo token, ports, and mock generation mode have built-in defaults. `npm run buyer` always starts the mock worker-mode marketplace; it reads optional overrides from `.env.local`. `npm run seller` reads optional overrides from `.env.worker`. No copying files or entering credentials is required for the local demo.
+The seller handle, matching demo token, and ports have built-in defaults. `npm run buyer` starts the worker-mode marketplace and reads optional overrides from `.env.local`. `npm run seller` reads optional overrides from `.env.worker` and automatically uses `~/Pictures/local-image-gen/generate.sh` when executable. Otherwise it uses the mock compositor. No copying files or entering credentials is required on this laptop.
 
 Or start both processes with one command:
 
@@ -75,12 +75,28 @@ Open both windows. The default worker serves `@studio.aure`, which owns **Luxury
 For the clearest demo:
 
 1. On the seller dashboard, click **Pause worker** before creating an order.
-2. In the marketplace, buy **Luxury Product Ad** with the sample product and a short brief.
+2. In the marketplace, buy **Luxury Product Ad** with a short text brief.
 3. The buyer sees **Waiting for @studio.aure’s laptop**. The marketplace never generates this image itself.
-4. Click **Resume worker** on the seller dashboard. Watch **Downloading input → Generating on this laptop → Uploading result**.
+4. Click **Resume worker** on the seller dashboard. Watch **Preparing text prompt → Generating with local AI → Uploading result** (or mock composition when no script is available).
 5. The buyer sees **Generated on Studio Auré · Seller laptop**, with the downloadable result. The seller also sees the image and activity log.
 
 Pausing stops new claims; an already claimed job finishes. The worker keeps polling independently of the buyer page, so you can close the buyer tab and return to the delivered result. `Ctrl+C` stops both demo processes. To use different ports: `DEMO_PORT=3003 WORKER_PORT=4003 npm run demo:distributed`.
+
+### Sell with your local generator
+
+On this laptop, `npm run seller` automatically finds:
+
+```text
+/Users/hangxie/Pictures/local-image-gen/generate.sh
+```
+
+It runs your existing Flux.2 Klein / MLX setup with `--steps 4 --seed 42 --width 768 --height 768`. Keep the T7 drive mounted, since your script stores its model cache there. The worker overrides `--output` with a unique temporary PNG path, removes prompt metadata, saves the finished image under `worker-data/`, and uploads it. The private recipe and buyer brief are passed together as a literal `--prompt` argument, without a shell. The worker processes one job at a time, renews its lease during generation, and stops a model process on shutdown or timeout (default three minutes).
+
+To participate: publish a style under `studio.aure` in **Seller studio**, set its price and private art direction, then leave `npm run seller` running while accepting orders. Buyers can choose any of that seller’s listings. No one needs to manually run `generate.sh` per order. If your laptop is asleep, disconnected, or the worker is stopped, orders wait. For continuous availability, run the worker and model on an always-on machine. This MVP records simulated sales; it does not transfer earnings.
+
+An optional `.env.worker` can change the script or defaults (see `.env.worker.example`). `SELLER_GENERATOR=local` requires a working script; `SELLER_GENERATOR=mock npm run seller` forces the demo compositor. Auto mode falls back only when no script is installed. A script that fails—for example because T7 is unmounted—marks the job failed for retry and **never silently substitutes a mock**. The dashboard and delivered job clearly label the renderer.
+
+New orders support **text-to-image only**. Existing image-input jobs remain readable; the mock and OpenAI providers retain compatibility, but the local script worker rejects those old jobs. Reference-image conditioning can be added later when the script supports it.
 
 ### Run on two actual laptops
 
@@ -115,16 +131,15 @@ sequenceDiagram
     participant Buyer
     participant Market as Marketplace laptop
     participant Seller as Seller laptop worker
-    Buyer->>Market: Brief + input + simulated USDC payment
+    Buyer->>Market: Text brief + simulated USDC payment
     Seller->>Market: Claim paid job for this seller
-    Market-->>Seller: Job + private claim token
-    Seller->>Market: Download input image
-    Note over Seller: Compose PNG locally and save a copy
+    Market-->>Seller: Job + private style recipe + claim token
+    Note over Seller: Run local model with the text prompt and save PNG
     Seller->>Market: Upload finished PNG
     Market-->>Buyer: Delivered image + seller machine label
 ```
 
-Claims are seller-scoped and atomic. Workers renew a 60-second lease every 10 seconds. If a worker disappears, another worker for the same seller can reclaim the order after the lease expires. Old claim tokens cannot overwrite a newer result. Completion is idempotent, and worker failures can be retried without another simulated payment. With no worker online, an order waits instead of falling back to marketplace generation. The worker receives public style metadata and uses its palette; hidden workflow prompts stay in the marketplace database. This worker currently supports **mock composition only**, even if the marketplace also has live API credentials.
+Claims are seller-scoped and atomic. Workers renew a 60-second lease every 10 seconds. If a worker disappears, another worker for the same seller can reclaim the order after the lease expires. Old claim tokens cannot overwrite a newer result. Completion is idempotent, and worker failures can be retried without another simulated payment. With no worker online, an order waits instead of falling back to marketplace generation. The authenticated worker receives only its own seller’s private workflow via the claim endpoint. It combines that recipe with the brief for local AI generation. Public listing and job endpoints never expose recipes. Mock mode uses the style palette rather than interpreting the recipe.
 
 Execution mode is saved on each order. Existing local-mode jobs keep their local behavior when the server switches to worker mode. Return to the original single-server flow with `EXECUTION_MODE=local` or by unsetting it and running `npm run dev`.
 
@@ -135,15 +150,15 @@ No `.env` file is required. To configure live generation, copy `.env.example` to
 | Variable             | Default           | Purpose                                                                                                                                                                          |
 | -------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GENERATION_MODE`    | `auto` when unset | `mock` always uses the local compositor; `auto` uses OpenAI when a key is present; `openai` explicitly requires the key. The example file selects `mock` for a predictable demo. |
-| `OPENAI_API_KEY`     | empty             | Server-side key for optional OpenAI image edits. Never exposed to the browser.                                                                                                   |
-| `OPENAI_IMAGE_MODEL` | `gpt-image-1`     | Image-edit model used by the OpenAI provider.                                                                                                                                    |
+| `OPENAI_API_KEY`     | empty             | Server-side key for optional OpenAI image generation. Never exposed to the browser.                                                                                              |
+| `OPENAI_IMAGE_MODEL` | `gpt-image-1`     | Image model used by the OpenAI provider.                                                                                                                                         |
 | `DATA_DIR`           | `./data`          | Writable folder for SQLite and uploaded/generated PNGs. Relative paths resolve from the project root.                                                                            |
 
 ### Mock mode
 
 `EXECUTION_MODE=local` (the default) runs generation in the marketplace process. `EXECUTION_MODE=worker` dispatches new jobs to configured sellers; `SELLER_WORKER_TOKENS` is the private JSON map of seller handles to worker bearer tokens. See the seller laptop demo above for configuration.
 
-Without an API key, the app creates a **1024 × 1280 PNG poster using the buyer’s actual input image**, brand name, brief, and the chosen style’s palette. This is a deterministic local composition, not an AI image edit or background removal. Six palettes provide different creative treatments. Newly published listings choose a demo palette; arbitrary hidden prompts are interpreted only by the live provider.
+In single-server mock mode, or when the seller worker has no local generator, the app creates a **1024 × 1280 abstract PNG poster** using the brand name, brief, and chosen style’s palette. This is a deterministic composition, not an AI-generated depiction of the subject. Six palettes provide different treatments. Arbitrary hidden prompts are interpreted by real generators only.
 
 The UI labels demo payments and locally composed results. All default images are checked into `public/samples/`; the demo makes no external image requests.
 
@@ -155,9 +170,9 @@ OPENAI_API_KEY=your-key
 OPENAI_IMAGE_MODEL=gpt-image-1
 ```
 
-The server uploads the buyer’s image to the [OpenAI Image API edits endpoint](https://developers.openai.com/api/docs/guides/image-generation#edit-images), with the seller’s private workflow, buyer brief, and optional brand name. The returned PNG is stored locally. Requires API credits and access to the configured model; provider charges are separate from the simulated marketplace price.
+In single-server mode, the server sends the seller’s private workflow, buyer brief, and optional brand name to the [OpenAI Image API generation endpoint](https://developers.openai.com/api/docs/guides/image-generation). The returned PNG is stored locally. Requires API credits and access to the configured model; provider charges are separate from the simulated marketplace price.
 
-Real provider errors are displayed as failed jobs with a retry action; the app does **not** silently substitute mock output after a live failure. Requests time out after 150 seconds. Live generation is implemented but automated tests run entirely in mock mode; no paid API requests are made by the tests.
+Real provider errors are displayed as failed jobs with a retry action; the app does **not** silently substitute mock output after a live failure. Requests time out after 150 seconds. No paid API requests are made by automated tests. The optional local-model integration check described below runs your installed script.
 
 ## How it works
 
@@ -175,13 +190,14 @@ src/lib/media.ts         Image validation, normalization, local storage
 src/lib/validation.ts    API input validation
 scripts/seed.ts          Optional explicit seed command
 scripts/seller-worker.ts Independent seller process and local dashboard server
+scripts/local-generator.ts Safe CLI adapter for a local text-to-image model
 scripts/distributed-demo.ts One-command marketplace + seller worker demo
 tests/                  Agent unit tests and Playwright acceptance tests
 ```
 
 SQLite stores `Seller`, `StyleListing`, and `GenerationJob` records as JSON in relational tables with stable primary keys and foreign keys. Prices are snapshotted on jobs and validated on the server. Seller handles group multiple styles under the same seller.
 
-Private workflow prompts stay in the server database. Public API responses, server-rendered listing data, agent selections, and job metadata use an explicit public projection that removes `hiddenWorkflowPrompt`.
+Private workflow prompts are stored in the server database and shared only with the generation provider or the authenticated worker assigned to that seller. Public API responses, server-rendered listing data, agent selections, and job metadata use an explicit public projection that removes `hiddenWorkflowPrompt`.
 
 In local mode, the browser polls job state and advances paid work through a small HTTP state machine. A SQLite compare-and-swap claim prevents duplicate provider calls from multiple tabs. Delivered jobs and payment confirmations are idempotent. If the local process stops during generation, the job becomes retryable after a three-minute stale-claim timeout. A local queued job advances when its page is open. In worker mode, the independent seller process drives generation and the browser only observes status; a separate SQLite table stores private claim tokens and leases. Neither mode needs an external queue service.
 
@@ -197,9 +213,17 @@ npm run test:worker
 npm run build
 ```
 
-Browser tests start their own server on port 3100 with an isolated database under `data/test-*`. They cover browsing, filtering, detail pages, real file upload, auto-picking, manual selection, mock payment, refresh recovery, download, seller publishing, private-prompt isolation, invalid requests, and mobile overflow. Screenshots are saved under `test-results/`.
+Browser tests start their own server on port 3100 with an isolated database under `data/test-*`. They cover browsing, filtering, detail pages, text-only ordering, seller sample upload, auto-picking, manual selection, mock payment, refresh recovery, download, seller publishing, private-prompt isolation, invalid requests, and mobile overflow. Screenshots are saved under `test-results/`.
 
-The worker browser test uses marketplace port 3102 and seller dashboard port 4102. It starts the actual seller process in an isolated temporary directory, verifies that orders wait without a worker, exercises pause/resume, and checks local output and HTTP delivery. Unit tests also cover seller credential isolation, unpaid/local-job exclusion, stale lease recovery, and idempotent completion. Run the two browser suites sequentially; both use the same Next.js development build directory.
+The worker browser test uses marketplace port 3102 and seller dashboard port 4102. It starts the actual seller process in an isolated temporary directory, verifies that orders wait without a worker, exercises pause/resume, and checks local output and HTTP delivery. Unit tests also cover seller credential isolation, unpaid/local-job exclusion, stale lease recovery, and idempotent completion. Test servers use an isolated `.next/testing` build so your running marketplace is left alone. Run the two browser suites sequentially; they share that test build directory.
+
+For an actual local-model delivery test (requires the installed generator and mounted model cache):
+
+```sh
+TEST_LOCAL_GENERATOR=1 npm run test:worker
+```
+
+This generates one real image, verifies delivery through the buyer UI, and saves `test-results/local-ai-delivery.png`. Regular tests force mock mode for predictable speed. All test servers shut down afterward.
 
 ## Deliberate MVP boundaries
 

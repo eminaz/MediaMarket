@@ -16,7 +16,6 @@ import {
 import { api } from '@/lib/client';
 import type { GenerationJob, StyleListing } from '@/lib/types';
 import { Avatar, StyleArtwork, Tags, Usdc } from './ui';
-import { ImageUpload } from './image-upload';
 
 const vibes = [
   'luxury',
@@ -43,7 +42,6 @@ export function CreateFlow({
 }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [image, setImage] = useState('');
   const [brief, setBrief] = useState('');
   const [brand, setBrand] = useState('');
   const [budget, setBudget] = useState('5');
@@ -57,7 +55,6 @@ export function CreateFlow({
   const [jobId, setJobId] = useState<string | null>(null);
   function next() {
     setError('');
-    if (!image) return setError('Add an input image, or try our sample product.');
     if (brief.trim().length < 5)
       return setError('Give your creator a short brief of at least 5 characters.');
     if (!Number.isFinite(Number(budget)) || Number(budget) <= 0 || Number(budget) > 10000)
@@ -92,7 +89,6 @@ export function CreateFlow({
       if (!id) {
         const job = await api<GenerationJob>('/api/jobs', {
           styleListingId: selected.id,
-          inputImageUrl: image,
           buyerBrief: brief,
           brandName: brand,
           budget: Number(budget),
@@ -148,10 +144,9 @@ export function CreateFlow({
                 <span className="section-number">01</span>
                 <div>
                   <h2>Give us the starting point.</h2>
-                  <p>A product, a portrait, a thing you love.</p>
+                  <p>Describe a product, a portrait, or a scene. No image needed.</p>
                 </div>
               </div>
-              <ImageUpload value={image} onChange={setImage} demo />
               <label className="field">
                 The brief <span>What are we making?</span>
                 <textarea
@@ -325,9 +320,8 @@ export function CreateFlow({
                 </div>
               </div>
               <div className="review-input">
-                <img src={image} alt="Your input" />
                 <div>
-                  <span className="eyebrow muted">YOUR STARTING POINT</span>
+                  <span className="eyebrow muted">TEXT TO IMAGE</span>
                   <h3>{brand || 'Untitled creation'}</h3>
                   <p>{brief}</p>
                   <Tags tags={tags} />
@@ -360,7 +354,7 @@ export function CreateFlow({
                   <p>
                     This is a simulated payment. No wallet, real tokens, or network fees.{' '}
                     {mode === 'worker'
-                      ? 'A separate seller worker will compose your image and send it back.'
+                      ? 'Your seller’s machine will generate the image and send it back.'
                       : mode === 'mock'
                         ? 'Your image uses our local demo compositor.'
                         : 'Image generation uses the configured live API.'}
@@ -443,7 +437,7 @@ export function CreateFlow({
                 of eyes.
               </h3>
               <p>
-                Every style is a creator’s unique recipe. Your image is the ingredient that makes it
+                Every style is a creator’s unique recipe. Your brief is the ingredient that makes it
                 yours.
               </p>
               <div>
@@ -463,7 +457,7 @@ export function CreateFlow({
           <div className="aside-footnote">
             <span className="status-dot" />
             {mode === 'worker'
-              ? 'Seller laptop mode · mock image renderer'
+              ? 'Seller laptop mode · text to image'
               : mode === 'mock'
                 ? 'Demo mode · no API key needed'
                 : 'Live image generation enabled'}

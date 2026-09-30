@@ -2,9 +2,11 @@ import { createServer } from 'node:http';
 import { hostname } from 'node:os';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { renderMockImage } from '../src/lib/mock-image';
 import type { WorkerAssignment } from '../src/lib/workers';
 import { demoSeller, demoToken } from './demo-defaults';
+import { localGeneratorConfig, buildGenerationPrompt, generateLocalImage } from './local-generator';
 
 // Worker settings are separate from the marketplace's .env.local.
 try {
@@ -19,6 +21,8 @@ const workerName = process.env.WORKER_NAME || `${seller} / ${hostname()}`;
 const port = Number(process.env.WORKER_PORT || 4001);
 const outputDir = path.resolve(process.env.WORKER_OUTPUT_DIR || 'worker-data');
 const delayMs = Number(process.env.WORKER_DEMO_DELAY_MS || 6000);
+const generator = await localGeneratorConfig();
+let activeGeneration: AbortController | null = null;
 if (token.length < 16)
   throw new Error(
     'Set SELLER_WORKER_TOKEN to the seller token configured on the marketplace (at least 16 characters).',
@@ -43,6 +47,8 @@ const state = {
   paused: false,
   connected: false,
   phase: 'Connecting',
+  renderer: generator ? 'Local AI model' : 'Mock compositor',
+  generationMode: generator ? 'local' : 'mock',
   currentJob: null as { id: string; style: string; brief: string } | null,
   lastOutput: null as string | null,
   completed: 0,
@@ -117,17 +123,23 @@ const server = createServer(async (req, res) => {
 server.listen(port, '127.0.0.1', () => {
   log(`Seller dashboard: http://localhost:${port}`);
   log(`Serving @${seller}. Rendering locally on ${hostname()}.`);
+  log(
+    generator
+      ? `Local model enabled: ${generator.width}×${generator.height}, ${generator.steps} steps, seed ${generator.seed}.`
+      : 'Mock compositor enabled. No local model is running.',
+  );
 });
 server.on('error', (error) => {
   console.error(error.message);
   process.exit(1);
 });
 async function work(assignment: WorkerAssignment) {
-  const { job, claimToken } = assignment;
+  const { job, claimToken, workflowPrompt } = assignment;
   const route = `/api/worker/jobs/${job.id}`;
   state.currentJob = { id: job.id, style: job.style.name, brief: job.buyerBrief };
   let leaseLost = false;
   let heartbeatBusy = false;
+  activeGeneration = new AbortController();
   const heartbeat = setInterval(async () => {
     if (heartbeatBusy || leaseLost) return;
     heartbeatBusy = true;
@@ -135,26 +147,46 @@ async function work(assignment: WorkerAssignment) {
       await request(`${route}/heartbeat`, { method: 'POST' }, claimToken);
     } catch {
       leaseLost = true;
+      activeGeneration?.abort();
       log('Lost contact with the marketplace. This claim will expire if delivery cannot finish.');
     } finally {
       heartbeatBusy = false;
     }
   }, 10_000);
   try {
-    state.phase = 'Downloading input';
+    state.phase = 'Preparing text prompt';
     log(`Claimed ${job.id.slice(0, 8)} · ${job.style.name}`);
-    const input = Buffer.from(
-      await (await request(`${route}/input`, {}, claimToken)).arrayBuffer(),
+    if (generator && job.inputImageUrl)
+      throw new Error(
+        'This local model worker supports text-to-image only. Create a new order with a text brief.',
+      );
+    state.phase = generator ? 'Generating with local AI' : 'Composing a mock image';
+    log(
+      generator
+        ? 'Brief received. Running the local model with the seller’s private style recipe.'
+        : 'Brief received. Composing the image locally in mock mode.',
     );
-    state.phase = 'Generating on this laptop';
-    log(`Input received (${Math.round(input.length / 1024)} KB). Composing the image locally.`);
-    await sleep(delayMs);
-    const output = await renderMockImage({
-      inputImage: input,
-      buyerBrief: job.buyerBrief,
-      brandName: job.brandName,
-      styleListing: job.style,
-    });
+    let output: Buffer;
+    if (generator) {
+      output = await generateLocalImage(
+        generator,
+        buildGenerationPrompt(workflowPrompt, job.buyerBrief, job.brandName),
+        path.join(outputDir, `${job.id}-${randomUUID()}.png`),
+        activeGeneration.signal,
+      );
+    } else {
+      const input = job.inputImageUrl
+        ? Buffer.from(await (await request(`${route}/input`, {}, claimToken)).arrayBuffer())
+        : null;
+      await sleep(delayMs);
+      activeGeneration.signal.throwIfAborted();
+      output = await renderMockImage({
+        inputImage: input,
+        buyerBrief: job.buyerBrief,
+        brandName: job.brandName,
+        styleListing: job.style,
+      });
+    }
     await writeFile(path.join(outputDir, `${job.id}.png`), output);
     if (leaseLost)
       throw new Error(
@@ -163,6 +195,7 @@ async function work(assignment: WorkerAssignment) {
     state.phase = 'Uploading result';
     log('PNG rendered on this machine. Uploading the finished image…');
     const form = new FormData();
+    form.set('generationMode', generator ? 'local' : 'mock');
     form.set('image', new Blob([new Uint8Array(output)], { type: 'image/png' }), 'output.png');
     // Completion is idempotent, so a lost response can be retried without a second delivery.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -182,6 +215,7 @@ async function work(assignment: WorkerAssignment) {
     await request(`${route}/fail`, { method: 'POST' }, claimToken).catch(() => {});
   } finally {
     clearInterval(heartbeat);
+    activeGeneration = null;
     state.currentJob = null;
     state.phase = state.paused ? 'Paused' : 'Waiting for a job';
   }
@@ -216,8 +250,9 @@ async function poll() {
 for (const signal of ['SIGINT', 'SIGTERM'] as const)
   process.on(signal, () => {
     stopped = true;
+    activeGeneration?.abort();
     log('Worker stopping. Unfinished jobs can be reclaimed after the lease expires.');
     server.close();
-    process.exit(0);
+    setTimeout(() => process.exit(0), 2500);
   });
 void poll();

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
-test('marketplace filters, detail, uploaded input, agent selection, payment and delivery', async ({
+test('marketplace filters, detail, text brief, agent selection, payment and delivery', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -16,10 +16,7 @@ test('marketplace filters, detail, uploaded input, agent selection, payment and 
   await expect(page.getByRole('heading', { name: 'Luxury Product Ad', exact: true })).toBeVisible();
   await expect(page.getByText('Commercial use allowed', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Use this style' }).click();
-  await page
-    .getByLabel('Upload your image', { exact: true })
-    .setInputFiles(path.resolve('public/samples/demo-product.png'));
-  await expect(page.getByText('Image ready', { exact: true })).toBeVisible();
+  await expect(page.locator('input[type=file]')).toHaveCount(0);
   await page.getByLabel('The brief').fill('A quiet luxury launch for a botanical skincare serum.');
   await page.getByLabel('Brand or subject name').fill('AURA skincare');
   await page.getByRole('button', { name: 'luxury', exact: true }).click();
@@ -54,7 +51,6 @@ test('manual selection and saved pending order recover without duplicate payment
   request,
 }) => {
   await page.goto('/create?style=meme-launch-graphic');
-  await page.getByRole('button', { name: /Try our sample product/ }).click();
   await page.getByLabel('The brief').fill('A funny new product launch for my serum.');
   await page.getByRole('button', { name: 'Find my style' }).click();
   await expect(page.locator('.style-option.selected')).toContainText('Meme Launch Graphic');
@@ -73,7 +69,6 @@ test('manual selection and saved pending order recover without duplicate payment
     await request.post('/api/jobs', {
       data: {
         styleListingId: 'luxury-product-ad',
-        inputImageUrl: '/samples/demo-product.png',
         buyerBrief: 'A fresh luxury product campaign.',
         budget: 5,
         desiredTags: [],
@@ -132,7 +127,6 @@ test('validation, unknown jobs, budget constraints and unsupported uploads', asy
       await request.post('/api/jobs', {
         data: {
           styleListingId: 'luxury-product-ad',
-          inputImageUrl: '/samples/demo-product.png',
           buyerBrief: 'A good brief.',
           budget: 0.2,
           desiredTags: [],

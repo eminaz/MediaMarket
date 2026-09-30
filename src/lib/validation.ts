@@ -7,7 +7,7 @@ const imageUrl = z
 export const tagsSchema = z.array(z.string().trim().min(1).max(30)).max(12);
 export const jobSchema = z.object({
   styleListingId: z.string().min(1),
-  inputImageUrl: z.string(),
+  inputImageUrl: z.string().nullable().optional().default(null),
   buyerBrief: z
     .string()
     .trim()

@@ -22,7 +22,7 @@ function job(overrides: Partial<GenerationJob> = {}) {
   return saveJob({
     id: randomUUID(),
     styleListingId: 'luxury-product-ad',
-    inputImageUrl: '/samples/demo-product.png',
+    inputImageUrl: null,
     buyerBrief: 'A luxury skincare campaign.',
     brandName: 'AURA',
     budget: 5,
@@ -71,7 +71,11 @@ test('only paid remote jobs for the matching seller are claimed once', async () 
   const response = await publicJob(new Request('http://localhost'), {
     params: Promise.resolve({ id: paid.id }),
   });
-  assert.equal((await response.text()).includes(assignment.claimToken), false);
+  const publicText = await response.text();
+  assert.ok(assignment.workflowPrompt.length > 10);
+  assert.equal(publicText.includes(assignment.claimToken), false);
+  assert.equal(publicText.includes(assignment.workflowPrompt), false);
+  assert.equal(publicText.includes('workflowPrompt'), false);
   finishWorkerJob('studio.aure', paid.id, assignment.claimToken, '/api/media/example.png');
 });
 test('marketplace advance never generates a worker-mode image', async () => {
@@ -107,8 +111,15 @@ test('leases recover interrupted jobs and reject stale or foreign completions', 
     () => finishWorkerJob('offgrid', waiting.id, replacement.claimToken, '/wrong.png'),
     /does not own/,
   );
-  const delivered = finishWorkerJob('studio.aure', waiting.id, replacement.claimToken, '/new.png');
+  const delivered = finishWorkerJob(
+    'studio.aure',
+    waiting.id,
+    replacement.claimToken,
+    '/new.png',
+    'local',
+  );
   assert.equal(delivered.status, 'delivered');
+  assert.equal(delivered.generationMode, 'local');
   assert.equal(delivered.workerName, 'Replacement laptop');
   assert.equal(
     finishWorkerJob('studio.aure', waiting.id, replacement.claimToken, '/duplicate.png')

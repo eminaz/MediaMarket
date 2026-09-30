@@ -12,12 +12,12 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
   request,
   context,
 }) => {
+  test.setTimeout(process.env.TEST_LOCAL_GENERATOR === '1' ? 180_000 : 90_000);
   expect(
     (await request.post('/api/worker/claim', { data: { workerName: 'Unauthenticated' } })).status(),
   ).toBe(401);
   await page.goto('/create?style=luxury-product-ad');
-  await expect(page.getByText('Seller laptop mode · mock image renderer')).toBeVisible();
-  await page.getByRole('button', { name: /Try our sample product/ }).click();
+  await expect(page.getByText('Seller laptop mode · text to image')).toBeVisible();
   await page
     .getByLabel('The brief')
     .fill('A botanical skincare launch, generated on the seller laptop.');
@@ -49,6 +49,7 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
         WORKER_NAME: 'Independent seller laptop',
         WORKER_PORT: '4102',
         WORKER_DEMO_DELAY_MS: '2500',
+        SELLER_GENERATOR: process.env.TEST_LOCAL_GENERATOR === '1' ? 'local' : 'mock',
         WORKER_OUTPUT_DIR: path.join(directory, 'output'),
       },
     },
@@ -63,11 +64,12 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
   try {
     await expect(
       page.getByText('Generated on Independent seller laptop', { exact: true }),
-    ).toBeVisible({ timeout: 30_000 });
+    ).toBeVisible({ timeout: process.env.TEST_LOCAL_GENERATOR === '1' ? 150_000 : 30_000 });
     expect(await readdir(directory)).toEqual(['output']); // The worker has no marketplace SQLite database or shared filesystem.
     expect(await readdir(path.join(directory, 'output'))).toContain(`${id}.png`);
     const job = await (await request.get(`/api/jobs/${id}`)).json();
-    expect(job.generationMode).toBe('mock');
+    expect(job.inputImageUrl).toBeNull();
+    expect(job.generationMode).toBe(process.env.TEST_LOCAL_GENERATOR === '1' ? 'local' : 'mock');
     expect(job.executionMode).toBe('worker');
     expect(await (await request.get(job.outputImageUrl)).body()).not.toHaveLength(0);
     const dashboard = await context.newPage();
@@ -79,11 +81,14 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
     await dashboard.getByRole('button', { name: 'Pause worker' }).click();
     await expect(dashboard.getByRole('button', { name: 'Resume worker' })).toBeVisible();
 
+    if (process.env.TEST_LOCAL_GENERATOR === '1') {
+      await page.screenshot({ path: 'test-results/local-ai-delivery.png', fullPage: true });
+      return;
+    }
     const second = await (
       await request.post('/api/jobs', {
         data: {
           styleListingId: 'botanical-editorial',
-          inputImageUrl: '/samples/demo-product.png',
           buyerBrief: 'A second remote botanical campaign.',
           budget: 5,
         },

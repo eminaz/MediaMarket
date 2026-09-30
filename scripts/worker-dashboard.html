@@ -298,9 +298,10 @@
         </aside>
       </div>
       <div class="facts">
-        <b>A real network handoff. A mock image renderer.</b><br />The marketplace queues an order →
-        this worker downloads the input → this laptop builds the PNG → the finished image travels
-        back to the buyer. Pausing stops new claims; an active job finishes normally.
+        <b id="renderer">Connecting to your image renderer…</b><br />The marketplace queues an order
+        → this worker receives the brief and private style recipe → this laptop builds the PNG → the
+        finished image travels back to the buyer. Pausing stops new claims; an active job finishes
+        normally.
       </div>
       <p class="muted">
         Marketplace: <a id="marketplace" target="_blank" rel="noopener"></a> · No real USDC
@@ -316,6 +317,10 @@
           const s = await (await fetch('/api/status')).json();
           el('worker-name').textContent = s.workerName;
           el('phase').textContent = s.phase;
+          el('renderer').textContent =
+            s.generationMode === 'local'
+              ? 'Local AI generation · text to image'
+              : 'Mock compositor · no AI model running';
           el('seller').textContent = '@' + s.seller;
           el('connection-text').textContent = s.paused
             ? 'Claims paused'

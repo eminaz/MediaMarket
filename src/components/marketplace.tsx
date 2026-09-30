@@ -120,7 +120,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
           </div>
           <div className="hero-art-caption">
             <span />
-            ONE INPUT. ENDLESS POINTS OF VIEW.
+            ONE BRIEF. ENDLESS POINTS OF VIEW.
           </div>
         </div>
       </section>
@@ -281,7 +281,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
             {
               n: '01',
               title: 'Bring something to the table.',
-              body: 'Upload your product or subject and share a short brief.',
+              body: 'Describe your subject and scene in a short text brief.',
             },
             {
               n: '02',

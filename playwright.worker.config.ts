@@ -12,6 +12,7 @@ export default defineConfig({
     timeout: 120_000,
     reuseExistingServer: false,
     env: {
+      NEXT_TEST_BUILD: '1',
       DEMO_PORT: '3102',
       SELLER_WORKER_TOKENS: '',
       SELLER_WORKER_TOKEN: '',

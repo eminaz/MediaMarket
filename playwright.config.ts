@@ -13,6 +13,7 @@ export default defineConfig({
     timeout: 120_000,
     reuseExistingServer: false,
     env: {
+      NEXT_TEST_BUILD: '1',
       GENERATION_MODE: 'mock',
       EXECUTION_MODE: 'local',
       DATA_DIR: path.resolve('data', `test-${Date.now()}`),

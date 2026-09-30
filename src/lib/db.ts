@@ -46,7 +46,7 @@ export function db() {
         publicPromptSummary: seed.summary,
         hiddenWorkflowPrompt: seed.prompt,
         inputRequirements:
-          'One product or subject image (PNG, JPG, or WebP, up to 10 MB) and a short creative brief.',
+          'A short text brief describing your subject, scene, and desired mood. No input image needed.',
         commercialUseAllowed: true,
         createdAt: now,
         palette: seed.palette,
@@ -55,6 +55,16 @@ export function db() {
       database
         .prepare('INSERT OR IGNORE INTO styles VALUES (?, ?, ?)')
         .run(style.id, seller.id, JSON.stringify(style));
+      // Migrate only the original seed requirement; preserve custom seller instructions.
+      database
+        .prepare(
+          "UPDATE styles SET data = json_set(data, '$.inputRequirements', ?) WHERE id = ? AND json_extract(data, '$.inputRequirements') = ?",
+        )
+        .run(
+          style.inputRequirements,
+          style.id,
+          'One product or subject image (PNG, JPG, or WebP, up to 10 MB) and a short creative brief.',
+        );
     }
     database.exec('COMMIT');
   } catch (error) {

@@ -28,7 +28,7 @@ export type PrivateStyleListing = StyleListing & { hiddenWorkflowPrompt: string 
 export type GenerationJob = {
   id: string;
   styleListingId: string;
-  inputImageUrl: string;
+  inputImageUrl: string | null;
   buyerBrief: string;
   brandName: string;
   budget: number;

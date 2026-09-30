@@ -1,10 +1,15 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { db, getJob, getStyle, saveJob } from './db';
+import { db, getJob, getStyle, getPrivateStyle, saveJob } from './db';
 import type { GenerationJob, JobWithStyle } from './types';
 
 // Claim tokens are kept in a separate table, never in public job responses.
 export const WORKER_LEASE_MS = 60_000;
-export type WorkerAssignment = { job: JobWithStyle; claimToken: string; leaseMs: number };
+export type WorkerAssignment = {
+  job: JobWithStyle;
+  claimToken: string;
+  leaseMs: number;
+  workflowPrompt: string;
+};
 type Claim = { jobId: string; sellerHandle: string; token: string; expiresAt: number };
 export class WorkerError extends Error {
   constructor(
@@ -96,8 +101,9 @@ export function claimNextJob(handle: string, workerName: string): WorkerAssignme
           'INSERT INTO worker_claims VALUES (?, ?, ?, ?) ON CONFLICT(jobId) DO UPDATE SET sellerHandle = excluded.sellerHandle, token = excluded.token, expiresAt = excluded.expiresAt',
         )
         .run(job.id, handle, claimToken, Date.now() + WORKER_LEASE_MS);
+      const workflowPrompt = getPrivateStyle(style.id)!.hiddenWorkflowPrompt;
       conn.exec('COMMIT');
-      return { job: { ...claimed, style }, claimToken, leaseMs: WORKER_LEASE_MS };
+      return { job: { ...claimed, style }, claimToken, leaseMs: WORKER_LEASE_MS, workflowPrompt };
     }
     conn.exec('COMMIT');
     return null;
@@ -127,14 +133,20 @@ export function heartbeat(handle: string, id: string, token: string) {
     .prepare('UPDATE worker_claims SET expiresAt = ? WHERE jobId = ? AND token = ?')
     .run(Date.now() + WORKER_LEASE_MS, id, token);
 }
-export function finishWorkerJob(handle: string, id: string, token: string, outputImageUrl: string) {
+export function finishWorkerJob(
+  handle: string,
+  id: string,
+  token: string,
+  outputImageUrl: string,
+  generationMode: 'mock' | 'local' = 'mock',
+) {
   // Re-check after image processing; an old laptop must never overwrite a new claim.
   const job = requireClaim(handle, id, token, true);
   if (job.status === 'delivered') return job;
   return saveJob({
     ...job,
     status: 'delivered',
-    generationMode: 'mock',
+    generationMode,
     outputImageUrl,
     error: null,
     updatedAt: new Date().toISOString(),

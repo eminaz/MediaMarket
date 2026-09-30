@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getStyle, getStyles, saveJob } from '@/lib/db';
 import { pickStyle } from '@/lib/agent';
-import { readImage } from '@/lib/media';
 import { apiError, jobSchema } from '@/lib/validation';
 import { executionMode, sellerHasWorker } from '@/lib/workers';
 export async function POST(request: Request) {
@@ -16,7 +15,10 @@ export async function POST(request: Request) {
       throw new Error(
         'This seller has no worker configured. Choose a style from a connected seller.',
       );
-    await readImage(input.inputImageUrl);
+    if (input.inputImageUrl)
+      throw new Error(
+        'New orders are text-to-image. Describe your subject in the brief; reference images will be supported later.',
+      );
     const pick = input.selectedByAgent
       ? pickStyle(
           getStyles().filter(
