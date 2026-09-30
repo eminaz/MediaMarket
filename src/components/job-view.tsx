@@ -286,6 +286,9 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
             )}
             <label>{job.inputImageUrl ? 'THE BRIEF' : 'TEXT TO IMAGE'}</label>
             <p>{job.buyerBrief}</p>
+            {job.requestSource === 'agent' && (
+              <p className="mode-note">Ordered by your agent · simulated USDC checkout</p>
+            )}
             <Tags tags={job.desiredTags} />
             {job.selectedByAgent && (
               <div className="agent-reason">

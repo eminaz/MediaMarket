@@ -35,6 +35,7 @@ export type GenerationJob = {
   desiredTags: string[];
   status: 'queued' | 'generating' | 'delivered' | 'failed';
   selectedByAgent: boolean;
+  requestSource?: 'web' | 'agent';
   decisionReason: string;
   paymentStatus: 'pending' | 'confirmed';
   paymentConfirmedAt: string | null;

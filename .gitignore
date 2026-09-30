@@ -19,6 +19,7 @@ next-env.d.ts
 /data/*
 !/data/.gitkeep
 /worker-data/
+/agent-output/
 *.sqlite
 *.sqlite-*
 *.db

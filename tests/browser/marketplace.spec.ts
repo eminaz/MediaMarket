@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { createRequire } from 'node:module';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+const require = createRequire(import.meta.url);
 test('marketplace filters, detail, text brief, agent selection, payment and delivery', async ({
   page,
 }) => {
@@ -167,4 +173,32 @@ test('mobile marketplace is usable without horizontal overflow', async ({ page }
   await page.screenshot({ path: 'test-results/marketplace-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: 'test-results/marketplace-desktop.png', fullPage: true });
+});
+
+test('headless agent also advances and downloads a single-server order', async ({ request }) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'agent-local-mode-'));
+  try {
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      [
+        '--import',
+        require.resolve('tsx'),
+        path.resolve('scripts/buyer-agent.ts'),
+        'A luxury serum bottle in soft morning light',
+        '--marketplace',
+        'http://127.0.0.1:3100',
+      ],
+      { cwd: directory, timeout: 30_000 },
+    );
+    const delivered = JSON.parse(stdout);
+    expect(delivered.status).toBe('delivered');
+    expect(delivered.generationMode).toBe('mock');
+    const status = await (await request.get(`/api/agent/orders/${delivered.jobId}`)).json();
+    expect(status.executionMode).toBe('local');
+    expect(await readFile(delivered.imagePath)).toEqual(
+      await (await request.get(delivered.imageUrl)).body(),
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

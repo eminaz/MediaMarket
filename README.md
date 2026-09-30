@@ -39,6 +39,61 @@ npm start
 
 Saved creations appear in **My creations**, including pending payments and interrupted work. Reloading a job resumes progress; failed jobs can be retried without another payment.
 
+## A buyer’s agent can order directly
+
+The user can ask their own agent for an image. That agent calls the marketplace over HTTP; the seller worker generates it; the agent downloads the PNG and displays it to its user. No marketplace browser page needs to be open.
+
+```mermaid
+sequenceDiagram
+    participant User as Buyer on laptop
+    participant Agent as Buyer agent
+    participant Market as Marketplace
+    participant Seller as Seller worker / local model
+    User->>Agent: Make a luxury skincare ad, budget 5 USDC
+    Agent->>Market: Discover styles and sellers
+    Agent->>Market: Order with prompt, budget, unique request key
+    Market-->>Agent: Selected style + simulated payment + job ID
+    Seller->>Market: Claim order
+    Note over Seller: Run private style recipe + buyer prompt through local model
+    Seller->>Market: Upload generated PNG
+    Agent->>Market: Poll status and download image
+    Agent-->>User: Show image on buyer laptop
+```
+
+With `npm run buyer` and `npm run seller` running, use a third terminal:
+
+```sh
+npm run agent -- "A luxury skincare bottle on an ivory plinth in soft morning light" --open
+```
+
+This discovers eligible styles, selects by tags inferred from the prompt, confirms **simulated USDC**, waits for delivery, downloads to the buyer’s ignored `agent-output/` folder, and opens the laptop’s image viewer. Defaults: **5 USDC budget**, marketplace `http://localhost:3001`, and a five-minute wait. No new environment variables are required. `--budget 3`, `--tags luxury,minimal`, `--brand AURA`, and `--style luxury-product-ad` are optional. Run `npm run agent -- --help` for all options.
+
+The reference CLI is a **deterministic HTTP client, not an LLM agent**. Your existing agent supplies the intelligence and can call the API directly, using its own HTTP tools. Give it the marketplace URL and this instruction:
+
+> Read http://localhost:3001/agent-guide.md. Generate a luxury skincare ad through this marketplace, with a maximum budget of 5 simulated USDC. Download the result and show me the image.
+
+Replace `localhost` with the marketplace’s reachable address for an agent on another machine. If an agent runs in a cloud environment, it should return an image attachment or result link; saving a file there does not save it to the user’s laptop. A local agent can save and display the PNG directly. Agents need HTTP access only—no seller token, model installation, or repository checkout.
+
+| Endpoint                                     | Purpose                                                              |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| `GET /api/agent`                             | Machine-readable discovery and workflow instructions                 |
+| `GET /api/agent/styles?budget=5&tags=luxury` | Public eligible styles; optional budget, tags, and `q` filters       |
+| `POST /api/agent/orders`                     | Select or auto-pick, create an order, and confirm simulated checkout |
+| `GET /api/agent/orders/{jobId}`              | State, selected style, reasoning, worker, result and download links  |
+| `GET /agent-guide.md`                        | Complete integration contract for external agents                    |
+
+Order JSON requires `prompt`, `budget`, and `payment: "simulated"`; optional fields are `desiredTags`, `brandName`, and `styleListingId`. Send an `Idempotency-Key` header unique to each intended order. Repeat the same key and body after a lost response to get the original job; changing the body with the same key returns 409. No real funds move. URLs in responses are relative to the marketplace origin. In worker mode, poll status every two seconds; in single-server mode, also POST the returned `advanceUrl` to drive generation. Failed jobs expose `retryUrl` so agents can retry the same paid order.
+
+The CLI prints progress to stderr and a final JSON object with `jobId`, `imagePath`, `imageUrl`, and `viewUrl` to stdout. Use `npm run --silent agent -- "your prompt"` for clean JSON output. `--open` is optional; an agent can render the saved image using its own file tools.
+
+To resume an existing order after a timeout or disconnect:
+
+```sh
+npm run agent -- --job JOB_ID --open
+```
+
+To point the client at another laptop, add only `MARKETPLACE_URL=http://MARKETPLACE_IP:3001` to `.env.agent`, or use `--marketplace http://MARKETPLACE_IP:3001`. The file is Git-ignored. The worker still runs on the seller machine. Seller configuration indicates eligibility, not live presence; an offline seller leaves the order queued.
+
 ## Seller laptop demo
 
 The marketplace can hand orders to a **separate seller worker over HTTP**. The worker receives the text brief and its seller’s private style recipe, generates a PNG on its own machine, saves a local copy, and uploads the result. It has no access to the marketplace database or filesystem. The seller can run a **real local AI model** or the mock compositor. Payment remains simulated.
@@ -183,12 +238,15 @@ src/lib/types.ts         Seller, StyleListing, GenerationJob, MediaType
 src/lib/db.ts            SQLite tables, idempotent seed, public projections
 src/lib/seed.ts          Six signature style listings
 src/lib/agent.ts         Budget filter → exact tag matches → lowest ETA → price
+src/lib/agent-orders.ts  Agent ordering, keyword tags, idempotency, public delivery metadata
+src/lib/jobs.ts          Shared web and agent order validation
 src/lib/generation.ts    ImageProvider interface, mock and OpenAI providers
 src/lib/mock-image.ts    Portable PNG compositor shared by local and seller execution
 src/lib/workers.ts       Seller authentication, atomic claims, leases, and completion
 src/lib/media.ts         Image validation, normalization, local storage
 src/lib/validation.ts    API input validation
 scripts/seed.ts          Optional explicit seed command
+scripts/buyer-agent.ts   HTTP reference client: discover → order → download PNG
 scripts/seller-worker.ts Independent seller process and local dashboard server
 scripts/local-generator.ts Safe CLI adapter for a local text-to-image model
 scripts/distributed-demo.ts One-command marketplace + seller worker demo
@@ -215,7 +273,7 @@ npm run build
 
 Browser tests start their own server on port 3100 with an isolated database under `data/test-*`. They cover browsing, filtering, detail pages, text-only ordering, seller sample upload, auto-picking, manual selection, mock payment, refresh recovery, download, seller publishing, private-prompt isolation, invalid requests, and mobile overflow. Screenshots are saved under `test-results/`.
 
-The worker browser test uses marketplace port 3102 and seller dashboard port 4102. It starts the actual seller process in an isolated temporary directory, verifies that orders wait without a worker, exercises pause/resume, and checks local output and HTTP delivery. Unit tests also cover seller credential isolation, unpaid/local-job exclusion, stale lease recovery, and idempotent completion. Test servers use an isolated `.next/testing` build so your running marketplace is left alone. Run the two browser suites sequentially; they share that test build directory.
+The worker browser test uses marketplace port 3102 and seller dashboard port 4102. It starts the actual seller process in an isolated temporary directory, verifies that orders wait without a worker, exercises pause/resume, and checks local output and HTTP delivery. It also runs a headless buyer client in another temporary directory, verifies the downloaded image matches the seller’s delivered PNG, and checks order replay and resume without a duplicate purchase. Unit tests also cover agent budgets, explicit simulated payment, private recipe isolation, concurrent order retries, seller credential isolation, unpaid/local-job exclusion, stale lease recovery, and idempotent completion. Test servers use an isolated `.next/testing` build so your running marketplace is left alone. Run the two browser suites sequentially; they share that test build directory.
 
 For an actual local-model delivery test (requires the installed generator and mounted model cache):
 

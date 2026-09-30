@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { spawn, execFile } from 'node:child_process';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
@@ -111,6 +112,62 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
     });
     await page.screenshot({ path: 'test-results/worker-delivery.png', fullPage: true });
     expect(output).toContain('Composing the image locally');
+
+    // A third machine: headless buyer agent, no page opened while its order runs.
+    const buyerDirectory = await mkdtemp(path.join(tmpdir(), 'buyer-agent-machine-'));
+    try {
+      const cliArgs = [
+        '--import',
+        require.resolve('tsx'),
+        path.resolve('scripts/buyer-agent.ts'),
+        'A luxury skincare bottle on an ivory plinth',
+        '--request-id',
+        `agent-${id}`,
+      ];
+      const options = {
+        cwd: buyerDirectory,
+        timeout: 45_000,
+        env: {
+          ...process.env,
+          MARKETPLACE_URL: 'http://127.0.0.1:3102',
+        },
+      };
+      const { stdout, stderr } = await promisify(execFile)(process.execPath, cliArgs, options);
+      const delivered = JSON.parse(stdout);
+      expect(delivered.status).toBe('delivered');
+      expect(delivered.generationMode).toBe('mock');
+      expect(delivered.seller).toBe('studio.aure');
+      expect(stderr).toContain('Found 2 eligible styles');
+      expect(await readdir(buyerDirectory)).toEqual(['agent-output']);
+      const localPng = await readFile(delivered.imagePath);
+      expect(localPng).toEqual(await (await request.get(delivered.imageUrl)).body());
+      expect(localPng.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+      const replay = JSON.parse(
+        (await promisify(execFile)(process.execPath, cliArgs, options)).stdout,
+      );
+      expect(replay.jobId).toBe(delivered.jobId);
+      const resumed = JSON.parse(
+        (
+          await promisify(execFile)(
+            process.execPath,
+            [
+              '--import',
+              require.resolve('tsx'),
+              path.resolve('scripts/buyer-agent.ts'),
+              '--job',
+              delivered.jobId,
+            ],
+            options,
+          )
+        ).stdout,
+      );
+      expect(resumed.jobId).toBe(delivered.jobId);
+      await page.goto(delivered.viewUrl);
+      await expect(page.getByText('Ordered by your agent · simulated USDC checkout')).toBeVisible();
+      await page.screenshot({ path: 'test-results/agent-delivery.png', fullPage: true });
+    } finally {
+      await rm(buyerDirectory, { recursive: true, force: true });
+    }
   } finally {
     worker.kill('SIGTERM');
     if (worker.exitCode === null) await once(worker, 'exit');
