@@ -5,6 +5,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { localMusicConfig, generateLocalMusic } from './local-music';
 import { renderMockMusic } from '../src/lib/audio';
+import { renderMockVideo } from '../src/lib/video';
+import { localVideoConfig, generateLocalVideo } from './local-video';
 import { renderMockImage } from '../src/lib/mock-image';
 import type { WorkerAssignment } from '../src/lib/workers';
 import { demoSeller, demoToken } from './demo-defaults';
@@ -25,6 +27,7 @@ const outputDir = path.resolve(process.env.WORKER_OUTPUT_DIR || 'worker-data');
 const delayMs = Number(process.env.WORKER_DEMO_DELAY_MS || 6000);
 const generator = await localGeneratorConfig();
 const musicGenerator = await localMusicConfig();
+const videoGenerator = await localVideoConfig(generator);
 let activeGeneration: AbortController | null = null;
 if (token.length < 16)
   throw new Error(
@@ -42,6 +45,9 @@ if (
 if (workerName.length < 2 || workerName.length > 60)
   throw new Error('WORKER_NAME must be 2–60 characters.');
 await mkdir(outputDir, { recursive: true });
+const extensions = { image: 'png', music: 'wav', video: 'mp4' } as const;
+const contentTypes = { image: 'image/png', music: 'audio/wav', video: 'video/mp4' } as const;
+const fields = { image: 'image', music: 'audio', video: 'video' } as const;
 const dashboard = await readFile(new URL('./worker-dashboard.html', import.meta.url));
 const state = {
   workerName,
@@ -54,8 +60,9 @@ const state = {
   generationMode: generator ? 'local' : 'mock',
   currentJob: null as { id: string; style: string; brief: string } | null,
   lastOutput: null as string | null,
-  lastOutputType: 'image' as 'image' | 'music',
+  lastOutputType: 'image' as 'image' | 'music' | 'video',
   musicRenderer: musicGenerator ? 'Local music model' : 'Mock synthesizer',
+  videoRenderer: videoGenerator ? 'Local scenes + Remotion' : 'Mock slideshow',
   completed: 0,
   events: [] as { time: string; message: string }[],
 };
@@ -114,21 +121,11 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify({ paused: state.paused }));
     return;
   }
-  if (
-    req.method === 'GET' &&
-    pathname === (state.lastOutputType === 'music' ? '/output.wav' : '/output.png') &&
-    state.lastOutput
-  ) {
+  const lastExtension = extensions[state.lastOutputType];
+  if (req.method === 'GET' && pathname === `/output.${lastExtension}` && state.lastOutput) {
     try {
-      res.setHeader('Content-Type', state.lastOutputType === 'music' ? 'audio/wav' : 'image/png');
-      res.end(
-        await readFile(
-          path.join(
-            outputDir,
-            `${state.lastOutput}.${state.lastOutputType === 'music' ? 'wav' : 'png'}`,
-          ),
-        ),
-      );
+      res.setHeader('Content-Type', contentTypes[state.lastOutputType]);
+      res.end(await readFile(path.join(outputDir, `${state.lastOutput}.${lastExtension}`)));
     } catch {
       res.writeHead(404).end();
     }
@@ -140,6 +137,11 @@ server.listen(port, '127.0.0.1', () => {
   log(`Seller dashboard: http://localhost:${port}`);
   log(`Serving @${seller}. Rendering locally on ${hostname()}.`);
   log(musicGenerator ? 'Local music model enabled.' : 'Music: demo synthesizer (no local model).');
+  log(
+    videoGenerator
+      ? `Local video enabled: ${videoGenerator.slides} scenes, ${videoGenerator.width}×${videoGenerator.height}.`
+      : 'Video: mock slideshow (needs demo-video.sh and the local image model).',
+  );
   log(
     generator
       ? `Local model enabled: ${generator.width}×${generator.height}, ${generator.steps} steps, seed ${generator.seed}.`
@@ -153,9 +155,11 @@ server.on('error', (error) => {
 async function work(assignment: WorkerAssignment) {
   const { job, claimToken, workflowPrompt } = assignment;
   const route = `/api/worker/jobs/${job.id}`;
-  const music = job.style.type === 'music';
-  const local = music ? !!musicGenerator : !!generator;
-  const extension = music ? 'wav' : 'png';
+  const type = job.style.type === 'music' || job.style.type === 'video' ? job.style.type : 'image';
+  const music = type === 'music';
+  const video = type === 'video';
+  const local = video ? !!videoGenerator : music ? !!musicGenerator : !!generator;
+  const extension = extensions[type];
   state.currentJob = { id: job.id, style: job.style.name, brief: job.buyerBrief };
   let leaseLost = false;
   let heartbeatBusy = false;
@@ -181,21 +185,52 @@ async function work(assignment: WorkerAssignment) {
         'This local model worker supports text-to-image only. Create a new order with a text brief.',
       );
     state.phase = local
-      ? music
-        ? 'Generating music with local AI'
-        : 'Generating with local AI'
-      : music
-        ? 'Synthesizing demo music'
-        : 'Composing a mock image';
+      ? video
+        ? 'Generating video with local AI'
+        : music
+          ? 'Generating music with local AI'
+          : 'Generating with local AI'
+      : video
+        ? 'Composing a demo video'
+        : music
+          ? 'Synthesizing demo music'
+          : 'Composing a mock image';
     log(
       local
         ? 'Brief received. Running the local model with the seller’s private style recipe.'
-        : music
-          ? 'Brief received. Synthesizing demo music locally.'
-          : 'Brief received. Composing the image locally in mock mode.',
+        : video
+          ? 'Brief received. Composing a demo slideshow video locally.'
+          : music
+            ? 'Brief received. Synthesizing demo music locally.'
+            : 'Brief received. Composing the image locally in mock mode.',
     );
     let output: Buffer;
-    if (music) {
+    if (video) {
+      const durationSeconds = job.style.durationSeconds || 15;
+      output =
+        videoGenerator && generator
+          ? await generateLocalVideo({
+              config: videoGenerator,
+              imageGenerator: generator,
+              musicGenerator,
+              workflowPrompt,
+              brief: job.buyerBrief,
+              brand: job.brandName,
+              durationSeconds,
+              workDirectory: outputDir,
+              signal: activeGeneration.signal,
+              onPhase: (phase) => {
+                state.phase = phase;
+                log(`${phase}…`);
+              },
+            })
+          : await renderMockVideo({
+              durationSeconds,
+              buyerBrief: job.buyerBrief,
+              brandName: job.brandName,
+              styleListing: job.style,
+            });
+    } else if (music) {
       const duration = job.style.durationSeconds || 10;
       const prompt = `${workflowPrompt}\nBuyer brief: ${job.buyerBrief}${job.brandName ? `\nProject: ${job.brandName}` : ''}`;
       output = musicGenerator
@@ -237,8 +272,8 @@ async function work(assignment: WorkerAssignment) {
     const form = new FormData();
     form.set('generationMode', local ? 'local' : 'mock');
     form.set(
-      music ? 'audio' : 'image',
-      new Blob([new Uint8Array(output)], { type: music ? 'audio/wav' : 'image/png' }),
+      fields[type],
+      new Blob([new Uint8Array(output)], { type: contentTypes[type] }),
       `output.${extension}`,
     );
     // Completion is idempotent, so a lost response can be retried without a second delivery.
@@ -253,7 +288,7 @@ async function work(assignment: WorkerAssignment) {
     }
     state.completed++;
     state.lastOutput = job.id;
-    state.lastOutputType = music ? 'music' : 'image';
+    state.lastOutputType = type;
     log(`Delivered ${job.id.slice(0, 8)}. The buyer can now download the creation.`);
   } catch (error) {
     log(`Job interrupted: ${(error as Error).message}`);

@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
     const type = z
-      .enum(['image', 'music'])
+      .enum(['image', 'music', 'video'])
       .optional()
       .parse(params.get('type') ?? undefined);
     const budget = z.coerce

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       .object({
         budget: z.number().finite().positive().max(10000),
         desiredTags: tagsSchema,
-        type: z.enum(['image', 'music']).default('image'),
+        type: z.enum(['image', 'music', 'video']).default('image'),
       })
       .parse(await request.json());
     const available = getStyles().filter(

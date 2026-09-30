@@ -109,7 +109,9 @@ export default function SellersPage() {
                               <span>
                                 {style.type === 'music'
                                   ? `${style.durationSeconds || 10}s music · `
-                                  : 'Image · '}
+                                  : style.type === 'video'
+                                    ? `${style.durationSeconds || 15}s video · `
+                                    : 'Image · '}
                                 ~{style.etaSeconds}s delivery
                               </span>
                             </span>

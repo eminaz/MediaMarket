@@ -116,4 +116,22 @@ export const seeds = [
     prompt:
       'Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, spacious and restrained arrangement, no vocals.',
   },
+  {
+    id: 'luxury-product-film',
+    type: 'video' as const,
+    durationSeconds: 15,
+    name: 'Luxury Product Film',
+    handle: 'studio.aure',
+    displayName: 'Studio Auré',
+    description:
+      'A short launch film for product reveals and social posts. Four generated scenes with slow zooms, pans, crossfades, clean headlines, and an original ambient soundtrack. A 15-second square MP4, generated for your brief.',
+    tags: ['luxury', 'minimal', 'product', 'video'],
+    priceUsdc: 4.5,
+    etaSeconds: 300,
+    palette: 'luxury',
+    sample: 'luxury.jpg',
+    summary: 'Four scenes. Slow light. A soundtrack to match.',
+    prompt:
+      'Quiet luxury product advertisement. Premium studio still life, soft directional morning light, warm neutral palette, refined materials, generous negative space, shallow depth of field, photorealistic. Soundtrack: minimal luxury ambient, warm soft piano, delicate shimmering textures, gentle electronic pulse, no vocals.',
+  },
 ];

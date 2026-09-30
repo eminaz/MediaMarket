@@ -4,14 +4,15 @@ import { dataDir } from '@/lib/db';
 export const runtime = 'nodejs';
 export async function GET(request: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
-  if (!/^[a-f0-9-]+\.(png|wav)$/.test(name)) return new Response('Not found', { status: 404 });
+  if (!/^[a-f0-9-]+\.(png|wav|mp4)$/.test(name)) return new Response('Not found', { status: 404 });
   try {
     const file = await readFile(path.join(dataDir, 'media', name));
     const download = new URL(request.url).searchParams.has('download');
-    const audio = name.endsWith('.wav');
+    const extension = path.extname(name).slice(1);
+    const streamable = extension !== 'png';
     let start = 0,
       end = file.length - 1;
-    const range = audio ? request.headers.get('range') : null;
+    const range = streamable ? request.headers.get('range') : null;
     if (range) {
       const match = /^bytes=(\d*)-(\d*)$/.exec(range);
       if (!match || (!match[1] && !match[2]))
@@ -35,15 +36,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ name
     return new Response(new Uint8Array(file.subarray(start, end + 1)), {
       status: range ? 206 : 200,
       headers: {
-        'Content-Type': audio ? 'audio/wav' : 'image/png',
+        'Content-Type': { png: 'image/png', wav: 'audio/wav', mp4: 'video/mp4' }[extension]!,
         'Content-Length': String(end - start + 1),
-        ...(audio ? { 'Accept-Ranges': 'bytes' } : {}),
+        ...(streamable ? { 'Accept-Ranges': 'bytes' } : {}),
         ...(range ? { 'Content-Range': `bytes ${start}-${end}/${file.length}` } : {}),
         'Cache-Control': 'public, max-age=31536000, immutable',
         'X-Content-Type-Options': 'nosniff',
         ...(download
           ? {
-              'Content-Disposition': `attachment; filename="tastemaker-creation.${audio ? 'wav' : 'png'}"`,
+              'Content-Disposition': `attachment; filename="tastemaker-creation.${extension}"`,
             }
           : {}),
       },

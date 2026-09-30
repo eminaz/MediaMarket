@@ -26,7 +26,7 @@ export const jobSchema = z.object({
   selectedByAgent: z.boolean().default(false),
 });
 export const listingSchema = z.object({
-  type: z.enum(['image', 'music']).default('image'),
+  type: z.enum(['image', 'music', 'video']).default('image'),
   durationSeconds: z.number().int().min(5).max(30).default(10),
   payoutAddress: z
     .string()

@@ -262,7 +262,7 @@
         <div>
           <span class="label">YOUR LAPTOP. YOUR CREATIVE STUDIO.</span>
           <h1 id="worker-name">Connecting your studio…</h1>
-          <p>Orders arrive here. Images and music are generated on this machine.</p>
+          <p>Orders arrive here. Images, music, and video are generated on this machine.</p>
         </div>
         <button id="toggle" disabled>Pause worker</button>
       </div>
@@ -296,11 +296,19 @@
               aria-label="Latest music generated on this seller machine"
               style="width: 100%"
             ></audio>
+            <video
+              id="video-output"
+              controls
+              playsinline
+              hidden
+              aria-label="Latest video generated on this seller machine"
+              style="width: 100%"
+            ></video>
             <img id="output" alt="Latest image generated on this seller machine" hidden />
           </div>
           <div class="caption">
-            <b id="completed">0 creations delivered</b><br />PNG or WAV saved locally, then uploaded
-            to the marketplace.
+            <b id="completed">0 creations delivered</b><br />PNG, WAV, or MP4 saved locally, then
+            uploaded to the marketplace.
           </div>
         </aside>
       </div>
@@ -329,7 +337,8 @@
             s.generationMode === 'local'
               ? 'Local AI generation · text to image'
               : 'Mock image compositor';
-          el('renderer').textContent += ' · Music: ' + s.musicRenderer;
+          el('renderer').textContent +=
+            ' · Music: ' + s.musicRenderer + ' · Video: ' + s.videoRenderer;
           el('seller').textContent = '@' + s.seller;
           el('connection-text').textContent = s.paused
             ? 'Claims paused'
@@ -349,15 +358,16 @@
           el('completed').textContent =
             s.completed + ' creation' + (s.completed === 1 ? '' : 's') + ' delivered';
           if (s.lastOutput && s.lastOutput !== lastOutput) {
-            const music = s.lastOutputType === 'music';
-            el('output').hidden = music;
-            el('audio-output').hidden = !music;
-            if (music)
-              el('audio-output').src = '/output.wav?id=' + encodeURIComponent(s.lastOutput);
-            else {
-              el('audio-output').pause();
-              el('output').src = '/output.png?id=' + encodeURIComponent(s.lastOutput);
-            }
+            const type = s.lastOutputType;
+            const id = '?id=' + encodeURIComponent(s.lastOutput);
+            el('output').hidden = type !== 'image';
+            el('audio-output').hidden = type !== 'music';
+            el('video-output').hidden = type !== 'video';
+            if (type !== 'music') el('audio-output').pause();
+            if (type !== 'video') el('video-output').pause();
+            if (type === 'music') el('audio-output').src = '/output.wav' + id;
+            else if (type === 'video') el('video-output').src = '/output.mp4' + id;
+            else el('output').src = '/output.png' + id;
             el('empty').hidden = true;
             lastOutput = s.lastOutput;
           }

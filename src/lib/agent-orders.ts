@@ -15,7 +15,7 @@ export const agentOrderSchema = z.object({
   brandName: jobSchema.shape.brandName,
   styleListingId: z.string().min(1).optional(),
   payment: z.enum(['simulated', 'pay-sandbox']),
-  type: z.enum(['image', 'music']).optional(),
+  type: z.enum(['image', 'music', 'video']).optional(),
 });
 export class AgentOrderError extends Error {
   constructor(
@@ -78,7 +78,7 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
       'image';
     const styles = orderableStyles().filter((style) => style.type === type);
     const tags = input.desiredTags.length ? input.desiredTags : inferTags(input.prompt, styles);
-    const pick = pickStyle(styles, input.budget, tags, type === 'music' ? 'music' : 'image');
+    const pick = pickStyle(styles, input.budget, tags, type);
     const style = input.styleListingId
       ? styles.find((style) => style.id === input.styleListingId)
       : pick?.style;
@@ -119,7 +119,7 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
 
 export function agentOrderView(job: GenerationJob) {
   const review = getOrderReview(job.id);
-  const outputUrl = job.outputAudioUrl || job.outputImageUrl;
+  const outputUrl = job.outputVideoUrl || job.outputAudioUrl || job.outputImageUrl;
   return {
     review,
     reviewUrl: job.status === 'delivered' && !review ? `/api/jobs/${job.id}/review` : null,
@@ -144,6 +144,7 @@ export function agentOrderView(job: GenerationJob) {
     viewUrl: `/jobs/${job.id}`,
     outputImageUrl: job.outputImageUrl,
     outputAudioUrl: job.outputAudioUrl || null,
+    outputVideoUrl: job.outputVideoUrl || null,
     outputUrl,
     downloadUrl: outputUrl ? `${outputUrl}?download=1` : null,
     advanceUrl: job.executionMode === 'worker' ? null : `/api/jobs/${job.id}/advance`,

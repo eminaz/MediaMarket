@@ -81,6 +81,7 @@ export type GenerationJob = {
   priceUsdc: number;
   outputImageUrl: string | null;
   outputAudioUrl?: string | null;
+  outputVideoUrl?: string | null;
   generationMode: string | null;
   executionMode?: 'local' | 'worker';
   workerName?: string | null;

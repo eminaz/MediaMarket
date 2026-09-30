@@ -25,7 +25,8 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
   const [paying, setPaying] = useState(false);
   const [copied, setCopied] = useState(false);
   const music = job.style.type === 'music';
-  const outputUrl = job.outputAudioUrl || job.outputImageUrl;
+  const video = job.style.type === 'video';
+  const outputUrl = job.outputVideoUrl || job.outputAudioUrl || job.outputImageUrl;
   const sandbox = job.paymentMode === 'pay-sandbox';
   const advancing = useRef(false);
   const done = job.status === 'delivered';
@@ -151,7 +152,17 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
         <section className="result-panel">
           {done && outputUrl ? (
             <>
-              {music ? (
+              {video ? (
+                <div className="result-video">
+                  <video
+                    controls
+                    playsInline
+                    preload="metadata"
+                    src={outputUrl}
+                    aria-label="Generated video"
+                  />
+                </div>
+              ) : music ? (
                 <div className="result-audio">
                   <StyleArtwork style={job.style} />
                   <h2>Your soundtrack is ready.</h2>
@@ -172,18 +183,21 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                   <span>
                     Your creation, ready to go.
                     <small>
-                      {music
-                        ? `${job.generationMode === 'local' ? 'Local AI music' : 'Demo synthesized audio'} · WAV`
-                        : job.generationMode === 'mock'
-                          ? 'Demo composition · 1024 × 1280 PNG'
-                          : job.generationMode === 'local'
-                            ? 'Local AI generation · PNG'
-                            : 'AI-generated image · PNG'}
+                      {video
+                        ? `${job.generationMode === 'local' ? 'Local AI video' : 'Demo slideshow'} · ${job.style.durationSeconds || 15}s MP4`
+                        : music
+                          ? `${job.generationMode === 'local' ? 'Local AI music' : 'Demo synthesized audio'} · WAV`
+                          : job.generationMode === 'mock'
+                            ? 'Demo composition · 1024 × 1280 PNG'
+                            : job.generationMode === 'local'
+                              ? 'Local AI generation · PNG'
+                              : 'AI-generated image · PNG'}
                     </small>
                   </span>
                 </div>
                 <a className="button button-dark" href={`${outputUrl}?download=1`} download>
-                  {music ? 'Download music' : 'Download image'} <Download size={16} />
+                  {video ? 'Download video' : music ? 'Download music' : 'Download image'}{' '}
+                  <Download size={16} />
                 </a>
               </div>
             </>
@@ -348,7 +362,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
               </div>
             )}
             <label>
-              {job.inputImageUrl ? 'THE BRIEF' : music ? 'TEXT TO MUSIC' : 'TEXT TO IMAGE'}
+              {job.inputImageUrl ? 'THE BRIEF' : `TEXT TO ${job.style.type.toUpperCase()}`}
             </label>
             <p>{job.buyerBrief}</p>
             {job.requestSource === 'agent' && (
@@ -383,13 +397,17 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
               </div>
             )}
             <div className="mode-note">
-              {music
+              {video
                 ? job.generationMode === 'mock'
-                  ? 'Demo synthesized audio. No AI music model was used.'
-                  : 'Generated with the seller’s local music model.'
-                : job.generationMode === 'mock'
-                  ? `${job.executionMode === 'worker' ? 'Composed on the seller’s machine and delivered over HTTP.' : 'Made with our local demo compositor.'} A deterministic demo poster using your brief and style palette; no AI model was used.`
-                  : 'Signature style. One image at a time.'}
+                  ? 'Demo slideshow of a mock poster with synthesized music. No AI model was used.'
+                  : 'Scenes and soundtrack generated with the seller’s local models, then edited into a film with Remotion.'
+                : music
+                  ? job.generationMode === 'mock'
+                    ? 'Demo synthesized audio. No AI music model was used.'
+                    : 'Generated with the seller’s local music model.'
+                  : job.generationMode === 'mock'
+                    ? `${job.executionMode === 'worker' ? 'Composed on the seller’s machine and delivered over HTTP.' : 'Made with our local demo compositor.'} A deterministic demo poster using your brief and style palette; no AI model was used.`
+                    : 'Signature style. One image at a time.'}
             </div>
           </div>
           {done && (

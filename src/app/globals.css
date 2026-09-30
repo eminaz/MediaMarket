@@ -4023,6 +4023,13 @@ button {
   width: 100%;
   margin: 20px 0;
 }
+.result-video video {
+  display: block;
+  width: 100%;
+  max-height: 72vh;
+  background: #000;
+  border-radius: 10px;
+}
 .result-audio p {
   color: var(--muted);
   font-size: 13px;

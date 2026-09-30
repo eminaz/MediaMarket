@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { AgentOrderView } from '../src/lib/agent-orders';
 import { PAY_SANDBOX_RPC } from '../src/lib/payment-mode';
 import { cleanWav } from '../src/lib/audio';
+import { validateMp4 } from '../src/lib/video';
 import { displayUsdc } from '../src/lib/payment-display';
 
 // An HTTP-only reference client. No marketplace DB, browser, model, or seller credentials.
@@ -36,7 +37,8 @@ async function main() {
   if (values.help) {
     console.log(`Usage: npm run agent -- "Your creative brief" [--open]
 Defaults: budget 5 USDC, marketplace http://localhost:3001, wait up to 300 seconds.
-Music: --type music (downloads WAV; clip duration is set by the selected listing)
+Music: --type music (downloads WAV) · Video: --type video (downloads MP4)
+       Clip duration is set by the selected listing.
 Optional: --budget 3 --tags luxury,minimal --brand AURA --style luxury-product-ad
           --marketplace http://BUYER_IP:3001 --output ./image.png --timeout 120
           --request-id unique-order-key --job existing-job-id
@@ -53,8 +55,8 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
     throw new Error(
       'Provide one quoted prompt, or --job <id> to resume an existing order. See --help.',
     );
-  if (values.type && !['image', 'music'].includes(values.type))
-    throw new Error('--type must be image or music.');
+  if (values.type && !['image', 'music', 'video'].includes(values.type))
+    throw new Error('--type must be image, music, or video.');
   const budget = Number(values.budget),
     timeout = Number(values.timeout);
   if (!Number.isFinite(budget) || budget < 0.01 || budget > 10000)
@@ -219,7 +221,10 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
   const response = await request(job.downloadUrl);
   const image = Buffer.from(await response.arrayBuffer());
   const music = job.style?.type === 'music';
-  if (music) cleanWav(image, job.style?.durationSeconds || 10);
+  const video = job.style?.type === 'video';
+  const extension = video ? 'mp4' : music ? 'wav' : 'png';
+  if (video) validateMp4(image, job.style?.durationSeconds || 15);
+  else if (music) cleanWav(image, job.style?.durationSeconds || 10);
   else if (
     image.length > 10 * 1024 * 1024 ||
     !image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
@@ -228,11 +233,13 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
   // Only our own safe filename or an explicit user path can choose a destination.
   const safeId = job.jobId.replace(/[^a-zA-Z0-9-]/g, '_');
   const imagePath = path.resolve(
-    values.output || path.join('agent-output', `${safeId}.${music ? 'wav' : 'png'}`),
+    values.output || path.join('agent-output', `${safeId}.${extension}`),
   );
   await mkdir(path.dirname(imagePath), { recursive: true });
   await writeFile(imagePath, image);
-  console.error(`Delivered. Saved ${music ? 'music' : 'image'} on this laptop: ${imagePath}`);
+  console.error(
+    `Delivered. Saved ${video ? 'video' : music ? 'music' : 'image'} on this laptop: ${imagePath}`,
+  );
   console.log(
     JSON.stringify(
       {
@@ -240,9 +247,11 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
         status: job.status,
         outputPath: imagePath,
         outputUrl: resolveUrl(job.outputUrl!),
-        ...(music
-          ? { audioPath: imagePath, audioUrl: resolveUrl(job.outputAudioUrl!) }
-          : { imagePath, imageUrl: resolveUrl(job.outputImageUrl!) }),
+        ...(video
+          ? { videoPath: imagePath, videoUrl: resolveUrl(job.outputVideoUrl!) }
+          : music
+            ? { audioPath: imagePath, audioUrl: resolveUrl(job.outputAudioUrl!) }
+            : { imagePath, imageUrl: resolveUrl(job.outputImageUrl!) }),
         viewUrl: resolveUrl(job.viewUrl),
         seller: job.style?.seller.handle,
         priceUsdc: job.payment.amountUsdc,

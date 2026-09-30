@@ -3,11 +3,11 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Check, EyeOff, LoaderCircle, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '@/lib/client';
-import type { StyleListing } from '@/lib/types';
+import type { MediaType, StyleListing } from '@/lib/types';
 import { ImageUpload } from './image-upload';
 export function SellerForm() {
   const router = useRouter();
-  const [mediaType, setMediaType] = useState<'image' | 'music'>('image');
+  const [mediaType, setMediaType] = useState<MediaType>('image');
   const [samples, setSamples] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,7 @@ export function SellerForm() {
     try {
       const listing = await api<StyleListing>('/api/styles', {
         type: mediaType,
-        durationSeconds: mediaType === 'music' ? Number(form.get('duration')) : undefined,
+        durationSeconds: mediaType === 'image' ? undefined : Number(form.get('duration')),
         name: form.get('name'),
         handle: String(form.get('handle')).replace(/^@/, ''),
         payoutAddress: String(form.get('payoutAddress') || '').trim(),
@@ -68,24 +68,23 @@ export function SellerForm() {
           </div>
           <label className="field">
             Media type
-            <select
-              value={mediaType}
-              onChange={(e) => setMediaType(e.target.value as 'image' | 'music')}
-            >
+            <select value={mediaType} onChange={(e) => setMediaType(e.target.value as MediaType)}>
               <option value="image">Image</option>
               <option value="music">Music</option>
+              <option value="video">Video</option>
             </select>
           </label>
-          {mediaType === 'music' && (
-            <label className="field">
-              Track duration <span>Seconds · included in the fixed price</span>
+          {mediaType !== 'image' && (
+            <label className="field" key={mediaType}>
+              {mediaType === 'video' ? 'Video duration' : 'Track duration'}{' '}
+              <span>Seconds · included in the fixed price</span>
               <input
                 name="duration"
                 type="number"
                 min="5"
                 max="30"
                 step="1"
-                defaultValue="10"
+                defaultValue={mediaType === 'video' ? '15' : '10'}
                 required
               />
             </label>
@@ -145,7 +144,12 @@ export function SellerForm() {
           </label>
           <div className="field-row">
             <label className="field">
-              {mediaType === 'music' ? 'Price per track' : 'Price per image'} <span>USDC</span>
+              {
+                { image: 'Price per image', music: 'Price per track', video: 'Price per video' }[
+                  mediaType
+                ]
+              }{' '}
+              <span>USDC</span>
               <input
                 name="price"
                 type="number"
@@ -164,7 +168,7 @@ export function SellerForm() {
           <div className="field">
             Show your signature{' '}
             <span>
-              {mediaType === 'music'
+              {mediaType !== 'image'
                 ? 'Optional cover artwork · defaults to our demo cover'
                 : '1–3 sample images'}
             </span>
@@ -200,9 +204,11 @@ export function SellerForm() {
               rows={2}
               key={mediaType}
               defaultValue={
-                mediaType === 'music'
-                  ? 'A short text brief describing mood, instruments, tempo, and intended use.'
-                  : 'A short text brief describing the subject, scene, and desired mood.'
+                mediaType === 'video'
+                  ? 'A short text brief describing the product, scenes, and mood, plus a brand name for the headlines.'
+                  : mediaType === 'music'
+                    ? 'A short text brief describing mood, instruments, tempo, and intended use.'
+                    : 'A short text brief describing the subject, scene, and desired mood.'
               }
             />
           </label>
@@ -238,7 +244,11 @@ export function SellerForm() {
                 minLength={15}
                 maxLength={4000}
                 rows={6}
-                placeholder="Describe your art direction, composition rules, lighting, textures, typography, and how to interpret the buyer’s text brief…"
+                placeholder={
+                  mediaType === 'video'
+                    ? 'Describe the visual direction for each scene, then add “Soundtrack:” followed by the music direction…'
+                    : 'Describe your art direction, composition rules, lighting, textures, typography, and how to interpret the buyer’s text brief…'
+                }
               />
             </label>
           </div>

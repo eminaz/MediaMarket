@@ -1,6 +1,6 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { db, getJob, getStyle, getPrivateStyle, saveJob } from './db';
-import type { GenerationJob, JobWithStyle } from './types';
+import type { GenerationJob, JobWithStyle, MediaType } from './types';
 import { paymentReady } from './payment-mode';
 
 // Claim tokens are kept in a separate table, never in public job responses.
@@ -135,6 +135,13 @@ export function heartbeat(handle: string, id: string, token: string) {
     .prepare('UPDATE worker_claims SET expiresAt = ? WHERE jobId = ? AND token = ?')
     .run(Date.now() + WORKER_LEASE_MS, id, token);
 }
+export function outputField(type: MediaType | undefined, outputUrl: string) {
+  return type === 'video'
+    ? { outputVideoUrl: outputUrl }
+    : type === 'music'
+      ? { outputAudioUrl: outputUrl }
+      : { outputImageUrl: outputUrl };
+}
 export function finishWorkerJob(
   handle: string,
   id: string,
@@ -149,9 +156,7 @@ export function finishWorkerJob(
     ...job,
     status: 'delivered',
     generationMode,
-    ...(getStyle(job.styleListingId)?.type === 'music'
-      ? { outputAudioUrl: outputUrl }
-      : { outputImageUrl: outputUrl }),
+    ...outputField(getStyle(job.styleListingId)?.type, outputUrl),
     error: null,
     updatedAt: new Date().toISOString(),
   });

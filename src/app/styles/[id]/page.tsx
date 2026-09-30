@@ -34,7 +34,11 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
               <Sparkles size={14} />A taste of what’s possible
             </span>
             <span>
-              {style.type === 'music' ? 'COVER ART / MUSIC STYLE' : 'EXAMPLE OUTPUT / 01'}
+              {style.type === 'music'
+                ? 'COVER ART / MUSIC STYLE'
+                : style.type === 'video'
+                  ? 'COVER ART / VIDEO STYLE'
+                  : 'EXAMPLE OUTPUT / 01'}
             </span>
           </div>
           {style.sampleImages.slice(1).map((src, i) => (
@@ -47,9 +51,7 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
         <div className="detail-copy">
-          <div className="eyebrow muted">
-            SIGNATURE {style.type === 'music' ? 'MUSIC' : 'IMAGE'} WORKFLOW
-          </div>
+          <div className="eyebrow muted">SIGNATURE {style.type.toUpperCase()} WORKFLOW</div>
           <h1>{style.name}</h1>
           <div className="seller-line large">
             <Avatar handle={style.seller.handle} />
@@ -75,7 +77,11 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
             <div>
               <Usdc amount={style.priceUsdc} />
               <span>
-                {style.type === 'music' ? `per ${style.durationSeconds || 10}s track` : 'per image'}{' '}
+                {style.type === 'music'
+                  ? `per ${style.durationSeconds || 10}s track`
+                  : style.type === 'video'
+                    ? `per ${style.durationSeconds || 15}s video`
+                    : 'per image'}{' '}
                 · one-time payment
               </span>
             </div>
@@ -112,9 +118,11 @@ export default async function StylePage({ params }: { params: Promise<{ id: stri
               What you get
             </h3>
             <p>
-              {style.type === 'music'
-                ? `A ${style.durationSeconds || 10}-second music track and a downloadable WAV.`
-                : 'A finished image and a downloadable PNG.'}{' '}
+              {style.type === 'video'
+                ? `A ${style.durationSeconds || 15}-second video with music and a downloadable MP4.`
+                : style.type === 'music'
+                  ? `A ${style.durationSeconds || 10}-second music track and a downloadable WAV.`
+                  : 'A finished image and a downloadable PNG.'}{' '}
               {style.commercialUseAllowed
                 ? 'Commercial use allowed under this seller’s listing terms.'
                 : 'Personal use only under this seller’s listing terms.'}

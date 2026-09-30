@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { dataDir, db } from './db';
 import { cleanWav, MAX_AUDIO_BYTES } from './audio';
+import { MAX_VIDEO_BYTES, validateMp4 } from './video';
 
 export async function saveAudioUpload(file: File, durationSeconds: number) {
   if (
@@ -12,6 +13,12 @@ export async function saveAudioUpload(file: File, durationSeconds: number) {
   )
     throw new Error('A WAV output up to 32 MB is required.');
   return saveMedia(cleanWav(Buffer.from(await file.arrayBuffer()), durationSeconds), 'wav');
+}
+
+export async function saveVideoUpload(file: File, durationSeconds: number) {
+  if (file.type !== 'video/mp4' || file.size > MAX_VIDEO_BYTES)
+    throw new Error('An MP4 output up to 64 MB is required.');
+  return saveMedia(validateMp4(Buffer.from(await file.arrayBuffer()), durationSeconds), 'mp4');
 }
 
 export async function saveUpload(file: File) {
@@ -30,7 +37,7 @@ export async function saveUpload(file: File) {
     .toBuffer();
   return saveMedia(buffer);
 }
-export async function saveMedia(buffer: Buffer, extension: 'png' | 'wav' = 'png') {
+export async function saveMedia(buffer: Buffer, extension: 'png' | 'wav' | 'mp4' = 'png') {
   db();
   const name = `${randomUUID()}.${extension}`;
   await writeFile(path.join(dataDir, 'media', name), buffer);

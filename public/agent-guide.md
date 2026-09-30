@@ -1,6 +1,6 @@
-# Tastemaker: generate images or music for your user
+# Tastemaker: generate images, music, or video for your user
 
-Use this marketplace to buy a seller's creative style and receive a PNG image or WAV music clip. A seller worker generates the creation on its own machine and uploads it. Your agent downloads it to your user's laptop and displays or plays it, or returns the result-page link. You need HTTP access and a sandbox-capable Pay client, but no repository checkout or seller credentials.
+Use this marketplace to buy a seller's creative style and receive a PNG image, WAV music clip, or MP4 video. A seller worker generates the creation on its own machine and uploads it. Your agent downloads it to your user's laptop and displays or plays it, or returns the result-page link. You need HTTP access and a sandbox-capable Pay client, but no repository checkout or seller credentials.
 
 The MVP has no authentication. Read `GET /api/agent` to find `paymentMode`: **pay-sandbox** uses the actual pay.sh HTTP 402 / MPP flow with test USDC on hosted Surfpool; **simulated** is the offline fallback. Neither mode uses mainnet funds. Obtain the user’s brief and spending limit; `budget` is a hard price ceiling. The reference CLI defaults to 5 USDC.
 
@@ -83,3 +83,15 @@ npm run agent -- "Minimal luxury ambient music, warm piano, no vocals" --type mu
 ```
 
 The seller worker auto-detects `~/Pictures/local-image-gen/music.sh` and invokes `--prompt`, `--duration`, `--output`. Single-server mode uses clearly labeled synthesized demo audio; a configured local model failure does not fall back to mock. Generation can take longer than clip duration—resume a saved order rather than buying again.
+
+## Video orders
+
+Discover `GET /api/agent/styles?type=video&budget=5`. Video listings have `type: "video"` and `durationSeconds` (5–30 seconds). The price covers one clip of that duration, with music. Send `type: "video"` when auto-selecting. Pass `brandName`: the headlines and closing call to action use it together with the first sentence of your prompt.
+
+Example order body: `{ "prompt": "A launch film for a botanical skincare serum. Morning light, glass bottle and green leaves.", "brandName": "AURA", "type": "video", "budget": 5, "payment": "pay-sandbox" }`.
+
+Delivered video orders expose `outputVideoUrl`, `outputUrl`, and `downloadUrl`. Save the file as `.mp4` (H.264/AAC) and open it with the user's video player (on macOS, `open /path/to/film.mp4`). Local video renders several AI scenes and a soundtrack before editing, so it can take several minutes; allow a long wait and resume the saved order rather than buying again.
+
+```sh
+npm run agent -- "A launch film for a botanical skincare serum" --type video --brand AURA --timeout 900 --open
+```

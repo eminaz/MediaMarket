@@ -2,6 +2,7 @@ import { renderMockImage } from './mock-image';
 import { readImage, saveMedia } from './media';
 import type { PrivateStyleListing } from './types';
 import { renderMockMusic } from './audio';
+import { renderMockVideo } from './video';
 
 type GenerationInput = {
   inputImage: string | null;
@@ -72,6 +73,13 @@ export const openaiProvider: ImageProvider = {
   },
 };
 export async function generateMedia(input: GenerationInput) {
+  if (input.styleListing.type === 'video') {
+    const buffer = await renderMockVideo({
+      ...input,
+      durationSeconds: input.styleListing.durationSeconds || 15,
+    });
+    return { outputVideoUrl: await saveMedia(buffer, 'mp4'), generationMode: 'mock' };
+  }
   if (input.styleListing.type === 'music') {
     const buffer = renderMockMusic(
       input.styleListing.durationSeconds || 10,

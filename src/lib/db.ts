@@ -65,14 +65,18 @@ export function db() {
         priceUsdc: seed.priceUsdc,
         etaSeconds: seed.etaSeconds,
         type: seed.type || 'image',
-        ...(seed.type === 'music' ? { durationSeconds: seed.durationSeconds } : {}),
+        ...(seed.type === 'music' || seed.type === 'video'
+          ? { durationSeconds: seed.durationSeconds }
+          : {}),
         sampleImages: [`/samples/${seed.sample}`],
         publicPromptSummary: seed.summary,
         hiddenWorkflowPrompt: seed.prompt,
         inputRequirements:
-          seed.type === 'music'
-            ? 'A short text brief describing mood, instruments, tempo, and intended use. Delivers a 10-second instrumental track.'
-            : 'A short text brief describing your subject, scene, and desired mood. No input image needed.',
+          seed.type === 'video'
+            ? 'A short text brief describing the product, scene, and mood. Add a brand name for the headlines. Delivers a 15-second MP4 with music.'
+            : seed.type === 'music'
+              ? 'A short text brief describing mood, instruments, tempo, and intended use. Delivers a 10-second instrumental track.'
+              : 'A short text brief describing your subject, scene, and desired mood. No input image needed.',
         commercialUseAllowed: true,
         createdAt: now,
         palette: seed.palette,

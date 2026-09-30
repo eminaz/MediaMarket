@@ -158,7 +158,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
           </span>
         </div>
         <div className="media-tabs" role="group" aria-label="Media type">
-          {['image', 'music'].map((type) => (
+          {['image', 'music', 'video'].map((type) => (
             <button
               key={type}
               className={`button ${mediaType === type ? 'button-dark' : 'button-light'}`}
@@ -169,7 +169,7 @@ export function Marketplace({ styles }: { styles: StyleListing[] }) {
                 setSearch('');
               }}
             >
-              {type === 'music' ? 'Music' : 'Images'}
+              {{ image: 'Images', music: 'Music', video: 'Video' }[type]}
             </button>
           ))}
         </div>

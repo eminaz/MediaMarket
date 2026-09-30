@@ -246,8 +246,8 @@ test('seller directory compares all sellers, their aggregated ratings and style 
   await expect(navigation.getByRole('link', { name: 'Seller studio' })).not.toHaveClass(/active/);
   await expect(page.locator('.seller-directory tbody tr')).toHaveCount(expectedSellers.size);
   const aure = page.locator('[data-seller="studio.aure"]');
-  await expect(aure).toContainText('3 styles');
-  await expect(aure.locator('.directory-price')).toHaveText('2.00–2.50');
+  await expect(aure).toContainText('4 styles');
+  await expect(aure.locator('.directory-price')).toHaveText('2.00–4.50');
   const seller = styles.find(
     (style: { sellerId: string }) => style.sellerId === 'studio.aure',
   ).seller;
@@ -256,7 +256,8 @@ test('seller directory compares all sellers, their aggregated ratings and style 
       ? `${seller.averageRating.toFixed(1)} stars · ${seller.reviewCount} ${seller.reviewCount === 1 ? 'review' : 'reviews'}`
       : 'No reviews yet',
   );
-  await expect(aure.locator('.directory-styles').getByRole('link')).toHaveCount(3);
+  await expect(aure.locator('.directory-styles').getByRole('link')).toHaveCount(4);
+  await expect(aure).toContainText('15s video');
   await expect(page.locator('[data-seller="offgrid"] .rating-summary')).toHaveText(
     'No reviews yet',
   );
@@ -406,4 +407,31 @@ test('music marketplace, auto-pick, checkout, WAV playback, review and seller pu
   expect(published.type).toBe('music');
   expect(published.priceUsdc).toBe(3.75);
   expect(JSON.stringify(published)).not.toContain('Private music recipe');
+});
+
+test('video marketplace, auto-pick, single-server checkout and MP4 download', async ({ page }) => {
+  await page.goto('/');
+  await page
+    .getByRole('group', { name: 'Media type' })
+    .getByRole('button', { name: 'Video', exact: true })
+    .click();
+  await expect(page.locator('.style-card')).toHaveCount(1);
+  await page.locator('.style-card').click();
+  await expect(page.getByText('per 15s video · one-time payment')).toBeVisible();
+  await page.getByRole('link', { name: 'Use this style' }).click();
+  await expect(page.getByLabel('What would you like to create?')).toHaveValue('video');
+  await page.getByLabel('The brief').fill('A launch film for a botanical skincare serum');
+  await page.getByRole('button', { name: 'Find my style', exact: true }).click();
+  await page.getByRole('button', { name: 'Auto-pick for me' }).click();
+  await expect(page.locator('.style-option.selected')).toContainText('Luxury Product Film');
+  await page.getByRole('button', { name: 'Review creation' }).click();
+  await expect(page.getByText('15-second video with music · MP4')).toBeVisible();
+  await page.getByRole('button', { name: 'Pay 4.50 USDC & create' }).click();
+  await expect(page.getByLabel('Generated video', { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByText('Demo slideshow · 15s MP4')).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download video' }).click();
+  expect((await downloadPromise).suggestedFilename()).toBe('tastemaker-creation.mp4');
 });

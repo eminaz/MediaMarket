@@ -6,7 +6,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: { default: 'Tastemaker — A marketplace for creative taste', template: '%s | Tastemaker' },
   description:
-    'Agents don’t just buy compute — they buy taste. Discover independent image and music styles, bring your brief, and make something worth seeing.',
+    'Agents don’t just buy compute — they buy taste. Discover independent image, music, and video styles, bring your brief, and make something worth seeing.',
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -22,7 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <span>
             Built for the Solana Agent Hackathon <span className="footer-star">✳</span>
           </span>
-          <span className="footer-meta">IMAGES & MUSIC. IMAGINATION ALWAYS.</span>
+          <span className="footer-meta">IMAGES, MUSIC & VIDEO. IMAGINATION ALWAYS.</span>
           <Link href="/sell" className="text-link">
             Seller studio ↗
           </Link>

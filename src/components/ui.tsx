@@ -92,13 +92,19 @@ export function StyleArtwork({
   className?: string;
 }) {
   const copy =
-    style.type === 'music'
+    style.type === 'video'
       ? {
-          eyebrow: 'SIGNATURE SOUND / ' + style.durationSeconds + ' SECONDS',
-          title: 'Set the\nmood.',
-          sub: 'MUSIC · MADE FOR YOUR MOMENT',
+          eyebrow: 'SIGNATURE FILM / ' + style.durationSeconds + ' SECONDS',
+          title: 'Roll\nthe film.',
+          sub: 'VIDEO · SCENES, MOTION & MUSIC',
         }
-      : words[style.palette] || words.luxury;
+      : style.type === 'music'
+        ? {
+            eyebrow: 'SIGNATURE SOUND / ' + style.durationSeconds + ' SECONDS',
+            title: 'Set the\nmood.',
+            sub: 'MUSIC · MADE FOR YOUR MOMENT',
+          }
+        : words[style.palette] || words.luxury;
   const custom = style.sampleImages[0]?.startsWith('/api/');
   return (
     <div className={`artwork art-${style.palette} ${className}`}>

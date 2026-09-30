@@ -14,7 +14,7 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import { api } from '@/lib/client';
-import type { GenerationJob, StyleListing } from '@/lib/types';
+import type { GenerationJob, MediaType, StyleListing } from '@/lib/types';
 import { Avatar, StyleArtwork, Tags, Usdc, Rating } from './ui';
 
 const vibes = [
@@ -46,8 +46,8 @@ export function CreateFlow({
   paymentMode: 'simulated' | 'pay-sandbox';
 }) {
   const router = useRouter();
-  const [mediaType, setMediaType] = useState<'image' | 'music'>(
-    styles.find((s) => s.id === initialStyle)?.type === 'music' ? 'music' : 'image',
+  const [mediaType, setMediaType] = useState<MediaType>(
+    styles.find((s) => s.id === initialStyle)?.type || 'image',
   );
   const matchingStyles = styles.filter((s) => s.type === mediaType);
   const [step, setStep] = useState(1);
@@ -159,9 +159,11 @@ export function CreateFlow({
                 <div>
                   <h2>Give us the starting point.</h2>
                   <p>
-                    {mediaType === 'music'
-                      ? 'Describe the mood, instruments, tempo, and intended use.'
-                      : 'Describe a product, a portrait, or a scene. No image needed.'}
+                    {mediaType === 'video'
+                      ? 'Describe the product, scenes, and mood. Your brand name becomes the headlines.'
+                      : mediaType === 'music'
+                        ? 'Describe the mood, instruments, tempo, and intended use.'
+                        : 'Describe a product, a portrait, or a scene. No image needed.'}
                   </p>
                 </div>
               </div>
@@ -170,7 +172,7 @@ export function CreateFlow({
                 <select
                   value={mediaType}
                   onChange={(e) => {
-                    setMediaType(e.target.value as 'image' | 'music');
+                    setMediaType(e.target.value as MediaType);
                     setSelected(null);
                     setAgent(false);
                     setReason('');
@@ -178,6 +180,7 @@ export function CreateFlow({
                 >
                   <option value="image">Image</option>
                   <option value="music">Music</option>
+                  <option value="video">Video</option>
                 </select>
               </label>
               <label className="field">
@@ -187,9 +190,11 @@ export function CreateFlow({
                   maxLength={1000}
                   onChange={(e) => setBrief(e.target.value)}
                   placeholder={
-                    mediaType === 'music'
-                      ? 'Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, no vocals'
-                      : 'A launch campaign for my new skincare line. Think quiet luxury, morning light, and less-is-more energy.'
+                    mediaType === 'video'
+                      ? 'A launch film for a botanical skincare serum. Morning light, glass and green leaves, calm and premium.'
+                      : mediaType === 'music'
+                        ? 'Minimal luxury ambient music, warm piano, shimmering textures, gentle electronic pulse, no vocals'
+                        : 'A launch campaign for my new skincare line. Think quiet luxury, morning light, and less-is-more energy.'
                   }
                   rows={4}
                 />
@@ -311,6 +316,7 @@ export function CreateFlow({
                       <span>
                         @{s.seller.handle} · ~{s.etaSeconds}s{' '}
                         {s.type === 'music' && `· ${s.durationSeconds || 10}s track`}
+                        {s.type === 'video' && `· ${s.durationSeconds || 15}s video`}
                       </span>
                       <span>{s.tags.join(' · ')}</span>
                       <Rating {...s} />
@@ -360,14 +366,18 @@ export function CreateFlow({
               </div>
               <div className="review-input">
                 <div>
-                  <span className="eyebrow muted">
-                    {mediaType === 'music' ? 'TEXT TO MUSIC' : 'TEXT TO IMAGE'}
-                  </span>
+                  <span className="eyebrow muted">{`TEXT TO ${mediaType.toUpperCase()}`}</span>
                   <h3>{brand || 'Untitled creation'}</h3>
                   <p>{brief}</p>
                   <Tags tags={tags} />
                 </div>
               </div>
+              {selected.type === 'video' && (
+                <p className="mode-note">
+                  {selected.durationSeconds || 15}-second video with music · MP4 · fixed price per
+                  clip
+                </p>
+              )}
               {selected.type === 'music' && (
                 <p className="mode-note">
                   {selected.durationSeconds || 10}-second music clip · WAV · fixed price per clip
@@ -403,11 +413,13 @@ export function CreateFlow({
                       : 'This is a simulated payment. No wallet, real tokens, or network fees. '}
                     {mode === 'worker'
                       ? 'Your seller’s machine will generate your creation and send it back.'
-                      : mediaType === 'music'
-                        ? 'Music uses the demo synthesizer in single-server mode. For local AI music, use the seller worker.'
-                        : mode === 'mock'
-                          ? 'Your image uses our local demo compositor.'
-                          : 'Image generation uses the configured live API.'}
+                      : mediaType === 'video'
+                        ? 'Video uses a demo slideshow in single-server mode. For local AI video, use the seller worker.'
+                        : mediaType === 'music'
+                          ? 'Music uses the demo synthesizer in single-server mode. For local AI music, use the seller worker.'
+                          : mode === 'mock'
+                            ? 'Your image uses our local demo compositor.'
+                            : 'Image generation uses the configured live API.'}
                   </p>
                 </div>
                 <span className="demo-badge">
@@ -441,7 +453,7 @@ export function CreateFlow({
               <p className="checkout-note">
                 <ShieldCheck size={13} />
                 {selected.commercialUseAllowed ? 'Commercial use allowed' : 'Personal use only'} ·
-                {mediaType === 'music' ? 'Downloadable WAV' : 'Downloadable PNG'}
+                {`Downloadable ${{ image: 'PNG', music: 'WAV', video: 'MP4' }[mediaType]}`}
               </p>
               {!busy && !jobId && (
                 <button className="text-button" onClick={() => setStep(2)}>
@@ -513,7 +525,7 @@ export function CreateFlow({
             <span className="status-dot" />
             {mode === 'worker'
               ? `Seller laptop mode · text to ${mediaType}`
-              : mode === 'mock' || mediaType === 'music'
+              : mode === 'mock' || mediaType !== 'image'
                 ? 'Demo mode · no API key needed'
                 : 'Live image generation enabled'}
           </div>

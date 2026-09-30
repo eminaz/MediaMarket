@@ -1,10 +1,10 @@
-import type { StyleListing } from './types';
+import type { MediaType, StyleListing } from './types';
 import { ratingScore } from './ratings';
 export function pickStyle(
   styles: StyleListing[],
   budget: number,
   requested: string[],
-  type: 'image' | 'music' = 'image',
+  type: MediaType = 'image',
 ) {
   const tags = [...new Set(requested.map((t) => t.trim().toLowerCase()).filter(Boolean))];
   const ranked = styles
