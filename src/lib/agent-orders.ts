@@ -4,6 +4,7 @@ import { db, getJob, getStyle, saveJob } from './db';
 import { pickStyle } from './agent';
 import { createJob, orderableStyles } from './jobs';
 import { jobSchema, tagsSchema } from './validation';
+import { paymentMode, jobPaymentMode } from './payment-mode';
 import type { GenerationJob, StyleListing } from './types';
 
 export const agentOrderSchema = z.object({
@@ -12,7 +13,7 @@ export const agentOrderSchema = z.object({
   desiredTags: tagsSchema.default([]),
   brandName: jobSchema.shape.brandName,
   styleListingId: z.string().min(1).optional(),
-  payment: z.literal('simulated'),
+  payment: z.enum(['simulated', 'pay-sandbox']),
 });
 export class AgentOrderError extends Error {
   constructor(
@@ -64,6 +65,11 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
       conn.exec('COMMIT');
       return { job, replayed: true };
     }
+    if (input.payment !== paymentMode())
+      throw new AgentOrderError(
+        `This marketplace requires payment: "${paymentMode()}". Check GET /api/agent before ordering.`,
+        400,
+      );
     const styles = orderableStyles();
     const tags = input.desiredTags.length ? input.desiredTags : inferTags(input.prompt, styles);
     const pick = pickStyle(styles, input.budget, tags);
@@ -89,8 +95,8 @@ export function createAgentOrder(values: unknown, requestKey: string | null) {
     const now = new Date().toISOString();
     const paid = saveJob({
       ...job,
-      paymentStatus: 'confirmed',
-      paymentConfirmedAt: now,
+      paymentStatus: input.payment === 'simulated' ? 'confirmed' : 'pending',
+      paymentConfirmedAt: input.payment === 'simulated' ? now : null,
       decisionReason: input.styleListingId
         ? 'Style selected by the buyer’s external agent.'
         : job.decisionReason,
@@ -109,7 +115,13 @@ export function agentOrderView(job: GenerationJob) {
   return {
     jobId: job.id,
     status: job.status,
-    payment: { mode: 'simulated', status: job.paymentStatus, amountUsdc: job.priceUsdc },
+    payment: {
+      mode: jobPaymentMode(job),
+      status: job.paymentStatus,
+      amountUsdc: job.priceUsdc,
+      receipt: job.paymentReceipt || null,
+    },
+    paymentUrl: job.paymentStatus === 'pending' ? `/api/jobs/${job.id}/pay` : null,
     style: getStyle(job.styleListingId),
     desiredTags: job.desiredTags,
     decisionReason: job.decisionReason,

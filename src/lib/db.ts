@@ -18,6 +18,8 @@ export function db() {
     CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, styleListingId TEXT NOT NULL REFERENCES styles(id), data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS worker_claims (jobId TEXT PRIMARY KEY REFERENCES jobs(id), sellerHandle TEXT NOT NULL, token TEXT NOT NULL, expiresAt INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS agent_requests (requestKey TEXT PRIMARY KEY, requestHash TEXT NOT NULL, jobId TEXT NOT NULL REFERENCES jobs(id));
+    CREATE TABLE IF NOT EXISTS payment_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS payment_locks (jobId TEXT PRIMARY KEY REFERENCES jobs(id), token TEXT NOT NULL, expiresAt INTEGER NOT NULL);
   `);
   const now = new Date().toISOString();
   database.exec('BEGIN IMMEDIATE');

@@ -4,6 +4,7 @@
   "description": "A marketplace for creative taste. Solana Agent Hackathon MVP.",
   "main": "index.js",
   "scripts": {
+    "postinstall": "node scripts/patch-pay-kit.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -24,6 +25,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@solana/pay-kit": "0.12.0",
     "lucide-react": "^1.49.0",
     "next": "^16.3.8",
     "react": "^19.3.0",

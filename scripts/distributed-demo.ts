@@ -6,7 +6,11 @@ const workerPort = process.env.WORKER_PORT || '4001';
 const seller = process.env.SELLER_HANDLE || 'studio.aure';
 const token = randomBytes(24).toString('hex');
 const marketplace = `http://localhost:${port}`;
-const common = { ...process.env, GENERATION_MODE: 'mock' };
+const common = {
+  ...process.env,
+  GENERATION_MODE: 'mock',
+  PAYMENT_MODE: process.env.PAYMENT_MODE || 'pay-sandbox',
+};
 console.log(
   `\nMarketplace: ${marketplace}\nSeller dashboard: http://localhost:${workerPort}\nSeller: @${seller} · choose Luxury Product Ad or Botanical Editorial for the default seller.\nTwo independent processes, connected over HTTP. Ctrl+C stops both.\n`,
 );

@@ -1,11 +1,17 @@
+import { paymentMode } from '@/lib/payment-mode';
 export async function GET() {
+  const mode = paymentMode();
   return Response.json({
     name: 'Tastemaker',
     version: '1',
     capability: 'text-to-image marketplace',
     guide: '/agent-guide.md',
     authentication: 'None in this hackathon demo. Orders and results are shared.',
-    payment: 'Simulated USDC only; no wallet or real funds.',
+    paymentMode: mode,
+    payment:
+      mode === 'pay-sandbox'
+        ? 'Pay.sh sandbox USDC via HTTP 402 / MPP. Test tokens on hosted Surfpool; no mainnet funds.'
+        : 'Simulated USDC; no wallet or real funds.',
     steps: [
       {
         method: 'GET',
@@ -19,10 +25,10 @@ export async function GET() {
         body: {
           prompt: 'A luxury skincare bottle in soft morning light',
           budget: 5,
-          payment: 'simulated',
+          payment: mode,
         },
         purpose:
-          'Auto-select a style and confirm simulated payment. Optional: desiredTags, brandName, styleListingId. budget is a hard maximum in USDC.',
+          'Auto-select a style and create an order. For pay-sandbox, call paymentUrl with pay --sandbox curl -X POST before generation. Optional: desiredTags, brandName, styleListingId. budget is a hard maximum in USDC.',
       },
       {
         method: 'GET',

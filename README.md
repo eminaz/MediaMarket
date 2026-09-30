@@ -2,7 +2,7 @@
 
 **Agents don’t just buy compute — they buy taste.**
 
-A hackathon MVP marketplace for independent image-generation styles. Sellers package a creative recipe; buyers describe an image in a brief, choose a style (or let a buyer agent choose), pay simulated USDC, and receive a downloadable image.
+A hackathon MVP marketplace for independent image-generation styles. Sellers package a creative recipe; buyers describe an image in a brief, choose a style (or let a buyer agent choose), pay through pay.sh sandbox (or simulated checkout), and receive a downloadable image.
 
 Built with Next.js App Router, TypeScript, Tailwind CSS, SQLite, and Sharp. No authentication, wallet, API key, or external database is needed for the default demo.
 
@@ -25,7 +25,7 @@ npm run build
 npm start
 ```
 
-## Demo walkthrough
+## Single-server simulated demo walkthrough
 
 1. Explore the marketplace; filter by vibe, search a creator, or sort by price and delivery time.
 2. Open **Luxury Product Ad** and click **Use this style**, or start **Create an image**.
@@ -52,8 +52,10 @@ sequenceDiagram
     User->>Agent: Make a luxury skincare ad, budget 5 USDC
     Agent->>Market: Discover styles and sellers
     Agent->>Market: Order with prompt, budget, unique request key
-    Market-->>Agent: Selected style + simulated payment + job ID
-    Seller->>Market: Claim order
+    Market-->>Agent: Selected style + pending payment + job ID
+    Agent->>Market: Pay.sh sandbox 402 payment + proof
+    Market-->>Agent: Verified test-USDC receipt
+    Seller->>Market: Claim paid order
     Note over Seller: Run private style recipe + buyer prompt through local model
     Seller->>Market: Upload generated PNG
     Agent->>Market: Poll status and download image
@@ -66,23 +68,23 @@ With `npm run buyer` and `npm run seller` running, use a third terminal:
 npm run agent -- "A luxury skincare bottle on an ivory plinth in soft morning light" --open
 ```
 
-This discovers eligible styles, selects by tags inferred from the prompt, confirms **simulated USDC**, waits for delivery, downloads to the buyer’s ignored `agent-output/` folder, and opens the laptop’s image viewer. Defaults: **5 USDC budget**, marketplace `http://localhost:3001`, and a five-minute wait. No new environment variables are required. `--budget 3`, `--tags luxury,minimal`, `--brand AURA`, and `--style luxury-product-ad` are optional. Run `npm run agent -- --help` for all options.
+This discovers eligible styles, selects by tags inferred from the prompt, pays with **pay.sh sandbox test USDC**, waits for delivery, downloads to the buyer’s ignored `agent-output/` folder, and opens the laptop’s image viewer. Defaults: **5 USDC budget**, marketplace `http://localhost:3001`, and a five-minute wait. No new environment variables are required. Install the Pay CLI (`brew install pay` or `npm install -g @solana/pay`) for sandbox checkout; it is already installed on this laptop. `--budget 3`, `--tags luxury,minimal`, `--brand AURA`, and `--style luxury-product-ad` are optional. Run `npm run agent -- --help` for all options.
 
 The reference CLI is a **deterministic HTTP client, not an LLM agent**. Your existing agent supplies the intelligence and can call the API directly, using its own HTTP tools. Give it the marketplace URL and this instruction:
 
-> Read http://localhost:3001/agent-guide.md. Generate a luxury skincare ad through this marketplace, with a maximum budget of 5 simulated USDC. Download the result and show me the image.
+> Read http://localhost:3001/agent-guide.md. Generate a luxury skincare ad through this marketplace, with a maximum budget of 5 sandbox test USDC. Download the result and show me the image.
 
-Replace `localhost` with the marketplace’s reachable address for an agent on another machine. If an agent runs in a cloud environment, it should return an image attachment or result link; saving a file there does not save it to the user’s laptop. A local agent can save and display the PNG directly. Agents need HTTP access only—no seller token, model installation, or repository checkout.
+Replace `localhost` with the marketplace’s reachable address for an agent on another machine. If an agent runs in a cloud environment, it should return an image attachment or result link; saving a file there does not save it to the user’s laptop. A local agent can save and display the PNG directly. Agents need HTTP access and a sandbox-capable Pay client—no seller token, model installation, or repository checkout.
 
-| Endpoint                                     | Purpose                                                              |
-| -------------------------------------------- | -------------------------------------------------------------------- |
-| `GET /api/agent`                             | Machine-readable discovery and workflow instructions                 |
-| `GET /api/agent/styles?budget=5&tags=luxury` | Public eligible styles; optional budget, tags, and `q` filters       |
-| `POST /api/agent/orders`                     | Select or auto-pick, create an order, and confirm simulated checkout |
-| `GET /api/agent/orders/{jobId}`              | State, selected style, reasoning, worker, result and download links  |
-| `GET /agent-guide.md`                        | Complete integration contract for external agents                    |
+| Endpoint                                     | Purpose                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| `GET /api/agent`                             | Machine-readable discovery and workflow instructions                |
+| `GET /api/agent/styles?budget=5&tags=luxury` | Public eligible styles; optional budget, tags, and `q` filters      |
+| `POST /api/agent/orders`                     | Select or auto-pick and create an order; returns its payment URL    |
+| `GET /api/agent/orders/{jobId}`              | State, selected style, reasoning, worker, result and download links |
+| `GET /agent-guide.md`                        | Complete integration contract for external agents                   |
 
-Order JSON requires `prompt`, `budget`, and `payment: "simulated"`; optional fields are `desiredTags`, `brandName`, and `styleListingId`. Send an `Idempotency-Key` header unique to each intended order. Repeat the same key and body after a lost response to get the original job; changing the body with the same key returns 409. No real funds move. URLs in responses are relative to the marketplace origin. In worker mode, poll status every two seconds; in single-server mode, also POST the returned `advanceUrl` to drive generation. Failed jobs expose `retryUrl` so agents can retry the same paid order.
+Order JSON requires `prompt`, `budget`, and `payment` matching `GET /api/agent` (`pay-sandbox` for `npm run buyer`, `simulated` for the single-server fallback); optional fields are `desiredTags`, `brandName`, and `styleListingId`. Send an `Idempotency-Key` header unique to each intended order. Repeat the same key and body after a lost response to get the original job; changing the body with the same key returns 409. Sandbox orders remain pending until `pay --sandbox curl -X POST <paymentUrl>` succeeds. The CLI does this automatically. No mainnet funds move. URLs in responses are relative to the marketplace origin. In worker mode, poll status every two seconds; in single-server mode, also POST the returned `advanceUrl` to drive generation. Failed jobs expose `retryUrl` so agents can retry the same paid order.
 
 The CLI prints progress to stderr and a final JSON object with `jobId`, `imagePath`, `imageUrl`, and `viewUrl` to stdout. Use `npm run --silent agent -- "your prompt"` for clean JSON output. `--open` is optional; an agent can render the saved image using its own file tools.
 
@@ -96,7 +98,7 @@ To point the client at another laptop, add only `MARKETPLACE_URL=http://MARKETPL
 
 ## Seller laptop demo
 
-The marketplace can hand orders to a **separate seller worker over HTTP**. The worker receives the text brief and its seller’s private style recipe, generates a PNG on its own machine, saves a local copy, and uploads the result. It has no access to the marketplace database or filesystem. The seller can run a **real local AI model** or the mock compositor. Payment remains simulated.
+The marketplace can hand orders to a **separate seller worker over HTTP**. The worker receives the text brief and its seller’s private style recipe, generates a PNG on its own machine, saves a local copy, and uploads the result. It has no access to the marketplace database or filesystem. The seller can run a **real local AI model** or the mock compositor. The default buyer launcher uses pay.sh sandbox payments; the single-server fallback can still simulate checkout.
 
 ### Quick demo on one laptop
 
@@ -112,7 +114,7 @@ npm run buyer
 npm run seller
 ```
 
-The seller handle, matching demo token, and ports have built-in defaults. `npm run buyer` starts the worker-mode marketplace and reads optional overrides from `.env.local`. `npm run seller` reads optional overrides from `.env.worker` and automatically uses `~/Pictures/local-image-gen/generate.sh` when executable. Otherwise it uses the mock compositor. No copying files or entering credentials is required on this laptop.
+The seller handle, matching demo token, and ports have built-in defaults. `npm run buyer` starts the worker-mode marketplace with `PAYMENT_MODE=pay-sandbox` by default and reads optional overrides from `.env.local`. `npm run seller` reads optional overrides from `.env.worker` and automatically uses `~/Pictures/local-image-gen/generate.sh` when executable. Otherwise it uses the mock compositor. No copying files or entering credentials is required on this laptop.
 
 Or start both processes with one command:
 
@@ -131,11 +133,11 @@ For the clearest demo:
 
 1. On the seller dashboard, click **Pause worker** before creating an order.
 2. In the marketplace, buy **Luxury Product Ad** with a short text brief.
-3. The buyer sees **Waiting for @studio.aure’s laptop**. The marketplace never generates this image itself.
+3. Complete the Pay sandbox checkout from your agent or the copied terminal command. The buyer then sees **Waiting for @studio.aure’s laptop**. The marketplace never generates this image itself.
 4. Click **Resume worker** on the seller dashboard. Watch **Preparing text prompt → Generating with local AI → Uploading result** (or mock composition when no script is available).
-5. The buyer sees **Generated on Studio Auré · Seller laptop**, with the downloadable result. The seller also sees the image and activity log.
+5. The buyer sees the seller machine name, a Pay sandbox receipt, and the downloadable result. The seller also sees the image and activity log.
 
-Pausing stops new claims; an already claimed job finishes. The worker keeps polling independently of the buyer page, so you can close the buyer tab and return to the delivered result. `Ctrl+C` stops both demo processes. To use different ports: `DEMO_PORT=3003 WORKER_PORT=4003 npm run demo:distributed`.
+Pausing stops new claims; an already claimed job finishes. The worker keeps polling independently of the buyer page, so you can close the buyer tab and return to the delivered result. `Ctrl+C` stops both demo processes. Both launchers default to Pay sandbox; use `PAYMENT_MODE=simulated` for offline checkout. To use different ports: `DEMO_PORT=3003 WORKER_PORT=4003 npm run demo:distributed`.
 
 ### Sell with your local generator
 
@@ -147,7 +149,7 @@ On this laptop, `npm run seller` automatically finds:
 
 It runs your existing Flux.2 Klein / MLX setup with `--steps 4 --seed 42 --width 768 --height 768`. Keep the T7 drive mounted, since your script stores its model cache there. The worker overrides `--output` with a unique temporary PNG path, removes prompt metadata, saves the finished image under `worker-data/`, and uploads it. The private recipe and buyer brief are passed together as a literal `--prompt` argument, without a shell. The worker processes one job at a time, renews its lease during generation, and stops a model process on shutdown or timeout (default three minutes).
 
-To participate: publish a style under `studio.aure` in **Seller studio**, set its price and private art direction, then leave `npm run seller` running while accepting orders. Buyers can choose any of that seller’s listings. No one needs to manually run `generate.sh` per order. If your laptop is asleep, disconnected, or the worker is stopped, orders wait. For continuous availability, run the worker and model on an always-on machine. This MVP records simulated sales; it does not transfer earnings.
+To participate: publish a style under `studio.aure` in **Seller studio**, set its price and private art direction, then leave `npm run seller` running while accepting orders. Buyers can choose any of that seller’s listings. No one needs to manually run `generate.sh` per order. If your laptop is asleep, disconnected, or the worker is stopped, orders wait. For continuous availability, run the worker and model on an always-on machine. In Pay sandbox mode, each seller handle receives test USDC at a deterministic demo wallet; its address appears on the order receipt. These public demo wallets are not production payout wallets and the tokens have no monetary value.
 
 An optional `.env.worker` can change the script or defaults (see `.env.worker.example`). `SELLER_GENERATOR=local` requires a working script; `SELLER_GENERATOR=mock npm run seller` forces the demo compositor. Auto mode falls back only when no script is installed. A script that fails—for example because T7 is unmounted—marks the job failed for retry and **never silently substitutes a mock**. The dashboard and delivered job clearly label the renderer.
 
@@ -186,7 +188,7 @@ sequenceDiagram
     participant Buyer
     participant Market as Marketplace laptop
     participant Seller as Seller laptop worker
-    Buyer->>Market: Text brief + simulated USDC payment
+    Buyer->>Market: Text brief + Pay sandbox test-USDC payment
     Seller->>Market: Claim paid job for this seller
     Market-->>Seller: Job + private style recipe + claim token
     Note over Seller: Run local model with the text prompt and save PNG
@@ -194,9 +196,34 @@ sequenceDiagram
     Market-->>Buyer: Delivered image + seller machine label
 ```
 
-Claims are seller-scoped and atomic. Workers renew a 60-second lease every 10 seconds. If a worker disappears, another worker for the same seller can reclaim the order after the lease expires. Old claim tokens cannot overwrite a newer result. Completion is idempotent, and worker failures can be retried without another simulated payment. With no worker online, an order waits instead of falling back to marketplace generation. The authenticated worker receives only its own seller’s private workflow via the claim endpoint. It combines that recipe with the brief for local AI generation. Public listing and job endpoints never expose recipes. Mock mode uses the style palette rather than interpreting the recipe.
+Claims are seller-scoped and atomic. Workers renew a 60-second lease every 10 seconds. If a worker disappears, another worker for the same seller can reclaim the order after the lease expires. Old claim tokens cannot overwrite a newer result. Completion is idempotent, and worker failures can be retried without another payment. With no worker online, an order waits instead of falling back to marketplace generation. The authenticated worker receives only its own seller’s private workflow via the claim endpoint. It combines that recipe with the brief for local AI generation. Public listing and job endpoints never expose recipes. Mock mode uses the style palette rather than interpreting the recipe.
 
 Execution mode is saved on each order. Existing local-mode jobs keep their local behavior when the server switches to worker mode. Return to the original single-server flow with `EXECUTION_MODE=local` or by unsetting it and running `npm run dev`.
+
+## Pay.sh sandbox checkout
+
+`npm run buyer` now uses the **real pay.sh client/server protocol on its test network**. The marketplace embeds `@solana/pay-kit` (MPP); no extra gateway server is required. `npm run agent -- "your prompt" --open` discovers the payment mode and invokes the installed `pay --sandbox` CLI before polling for the image.
+
+Pay calls this mode **sandbox**: its network label is `localnet`, running on hosted Surfpool at `https://402.surfnet.dev:8899`. It is distinct from Solana public devnet/testnet. The CLI automatically creates and funds a sandbox buyer wallet. The marketplace initializes missing seller test-token accounts and sponsors transaction fees with the SDK’s public demo signer. All endpoints and signing configuration in this integration are pinned to the sandbox. [Official network docs](https://pay.sh/docs/pay-for-apis/sandbox-and-networks), [TypeScript SDK](https://github.com/solana-foundation/pay-kit/tree/main/typescript).
+
+For browser checkout, click **Continue to pay.sh**, then **Copy pay.sh payment command** on the saved order and run it locally. It looks like:
+
+```sh
+pay --sandbox curl -X POST http://localhost:3001/api/jobs/JOB_ID/pay
+```
+
+The browser observes payment and generation automatically. The server returns 402 until the proof verifies, then saves the transaction signature, seller test-wallet address, and exact listing price on the order. It binds challenges to individual orders, retains replay records in SQLite, and serializes payment verification. Already-paid orders return their receipt without a second charge. After a lost payment response, inspect the saved order before retrying. Failures remain unpaid; there is no fallback that pretends the transaction succeeded. A process crash after settlement but before saving the job can require reconciliation from the chain receipt; this is still a hackathon MVP.
+
+Existing orders retain their original payment mode. Restart `npm run buyer` after this update to enable sandbox for new orders; the seller process uses the same generation flow. For a completely offline demo use `PAYMENT_MODE=simulated npm run buyer`, or `npm run dev` (single-server mock default). `PAYMENT_MODE` may also be saved in `.env.local`.
+
+The dependency is pinned to **pay-kit 0.12.0**. `npm install` applies a narrow compatibility fix in `scripts/patch-pay-kit.mjs`: the MPP broadcaster uses `preflightCommitment: "confirmed"`, matching the SDK’s blockhash lookup and transaction simulation. This resolves Surfpool’s fresh-blockhash rejection; preflight, signature verification, and on-chain confirmation all remain enabled. Review/remove the patch when upgrading the SDK.
+
+```sh
+# Opt-in integration check: installed pay CLI + hosted sandbox, one 2.50 test-USDC payment
+TEST_PAY_SANDBOX=1 npm run test:worker
+```
+
+This checks the 402 challenge, rejects an invalid proof, uses Pay to settle the order, checks the exact transfer amount on the sandbox chain, verifies seller delivery and the buyer’s downloaded PNG, and verifies that retries return the same receipt. No mainnet funds are used. Normal tests force simulated checkout and do not contact the payment network.
 
 ## Environment variables
 
@@ -204,6 +231,7 @@ No `.env` file is required. To configure live generation, copy `.env.example` to
 
 | Variable             | Default           | Purpose                                                                                                                                                                          |
 | -------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PAYMENT_MODE`       | `pay-sandbox` in buyer/distributed launchers; otherwise `simulated` | Real Pay sandbox test-USDC checkout or offline simulated payment. No mainnet mode. |
 | `GENERATION_MODE`    | `auto` when unset | `mock` always uses the local compositor; `auto` uses OpenAI when a key is present; `openai` explicitly requires the key. The example file selects `mock` for a predictable demo. |
 | `OPENAI_API_KEY`     | empty             | Server-side key for optional OpenAI image generation. Never exposed to the browser.                                                                                              |
 | `OPENAI_IMAGE_MODEL` | `gpt-image-1`     | Image model used by the OpenAI provider.                                                                                                                                         |
@@ -225,7 +253,7 @@ OPENAI_API_KEY=your-key
 OPENAI_IMAGE_MODEL=gpt-image-1
 ```
 
-In single-server mode, the server sends the seller’s private workflow, buyer brief, and optional brand name to the [OpenAI Image API generation endpoint](https://developers.openai.com/api/docs/guides/image-generation). The returned PNG is stored locally. Requires API credits and access to the configured model; provider charges are separate from the simulated marketplace price.
+In single-server mode, the server sends the seller’s private workflow, buyer brief, and optional brand name to the [OpenAI Image API generation endpoint](https://developers.openai.com/api/docs/guides/image-generation). The returned PNG is stored locally. Requires API credits and access to the configured model; provider charges are separate from the sandbox/demo marketplace price.
 
 Real provider errors are displayed as failed jobs with a retry action; the app does **not** silently substitute mock output after a live failure. Requests time out after 150 seconds. No paid API requests are made by automated tests. The optional local-model integration check described below runs your installed script.
 
@@ -246,7 +274,8 @@ src/lib/workers.ts       Seller authentication, atomic claims, leases, and compl
 src/lib/media.ts         Image validation, normalization, local storage
 src/lib/validation.ts    API input validation
 scripts/seed.ts          Optional explicit seed command
-scripts/buyer-agent.ts   HTTP reference client: discover → order → download PNG
+scripts/buyer-agent.ts   HTTP reference client: discover → order → Pay sandbox → download PNG
+src/lib/pay-sandbox.ts   Pay SDK verification, test wallets, and persisted receipts
 scripts/seller-worker.ts Independent seller process and local dashboard server
 scripts/local-generator.ts Safe CLI adapter for a local text-to-image model
 scripts/distributed-demo.ts One-command marketplace + seller worker demo
@@ -273,7 +302,7 @@ npm run build
 
 Browser tests start their own server on port 3100 with an isolated database under `data/test-*`. They cover browsing, filtering, detail pages, text-only ordering, seller sample upload, auto-picking, manual selection, mock payment, refresh recovery, download, seller publishing, private-prompt isolation, invalid requests, and mobile overflow. Screenshots are saved under `test-results/`.
 
-The worker browser test uses marketplace port 3102 and seller dashboard port 4102. It starts the actual seller process in an isolated temporary directory, verifies that orders wait without a worker, exercises pause/resume, and checks local output and HTTP delivery. It also runs a headless buyer client in another temporary directory, verifies the downloaded image matches the seller’s delivered PNG, and checks order replay and resume without a duplicate purchase. Unit tests also cover agent budgets, explicit simulated payment, private recipe isolation, concurrent order retries, seller credential isolation, unpaid/local-job exclusion, stale lease recovery, and idempotent completion. Test servers use an isolated `.next/testing` build so your running marketplace is left alone. Run the two browser suites sequentially; they share that test build directory.
+The worker browser test uses marketplace port 3102 and seller dashboard port 4102. It starts the actual seller process in an isolated temporary directory, verifies that orders wait without a worker, exercises pause/resume, and checks local output and HTTP delivery. It also runs a headless buyer client in another temporary directory, verifies the downloaded image matches the seller’s delivered PNG, and checks order replay and resume without a duplicate purchase. Unit tests also cover agent budgets, explicit payment modes, sandbox bypass prevention, private recipe isolation, concurrent order retries, seller credential isolation, unpaid/local-job exclusion, stale lease recovery, and idempotent completion. Test servers use an isolated `.next/testing` build so your running marketplace is left alone. Run the two browser suites sequentially; they share that test build directory.
 
 For an actual local-model delivery test (requires the installed generator and mounted model cache):
 
@@ -285,7 +314,7 @@ This generates one real image, verifies delivery through the buyer UI, and saves
 
 ## Deliberate MVP boundaries
 
-- **Payments are simulated.** There are no on-chain transactions, wallet connections, settlement, or real balances. The app is Solana/USDC themed, not an on-chain marketplace.
+- **Payments use test funds.** Pay sandbox mode performs verified MPP settlement on hosted Surfpool. Simulated mode remains available. Mainnet, production seller wallets, refunds, and reconciliation tooling are not implemented.
 - **No sign-in.** Seller handles, creations, uploads, and job URLs are shared by users of the local instance. Workflow prompts are omitted from public routes, but this is not a secure multi-tenant service.
 - **Persistent local disk is required.** Use a long-running Node process with writable storage. Ephemeral serverless filesystems require a different database, object storage, and a durable worker.
 - Uploads are limited to 10 MB and PNG/JPG/WebP; decoded images are capped at 40 million pixels and normalized to PNG with a maximum dimension of 1600 pixels.
@@ -293,7 +322,7 @@ This generates one real image, verifies delivery through the buyer UI, and saves
 
 ## Extending to video
 
-`MediaType` already allows `image | video`. The current picker and checkout only accept image listings. Add a video provider with an asynchronous submit/status interface, duration/aspect-ratio inputs, object storage for larger files, and a video player on the delivery page. Reuse sellers, style recipes, pricing, payment state, and the overall job flow. A real Solana USDC payment adapter and worker queue can replace the mock payment and browser-driven generation independently.
+`MediaType` already allows `image | video`. The current picker and checkout only accept image listings. Add a video provider with an asynchronous submit/status interface, duration/aspect-ratio inputs, object storage for larger files, and a video player on the delivery page. Reuse sellers, style recipes, pricing, payment state, and the overall job flow. Production Solana settlement and a durable worker queue can replace sandbox payments and browser-driven local generation independently.
 
 ## Preview image credits
 

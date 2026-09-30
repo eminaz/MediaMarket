@@ -14,6 +14,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       NEXT_TEST_BUILD: '1',
+      PAYMENT_MODE: 'simulated',
       GENERATION_MODE: 'mock',
       EXECUTION_MODE: 'local',
       DATA_DIR: path.resolve('data', `test-${Date.now()}`),

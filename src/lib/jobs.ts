@@ -3,6 +3,7 @@ import { getStyle, getStyles, saveJob } from './db';
 import { pickStyle } from './agent';
 import { jobSchema } from './validation';
 import { executionMode, sellerHasWorker } from './workers';
+import { paymentMode } from './payment-mode';
 
 export function orderableStyles() {
   return getStyles().filter(
@@ -45,6 +46,7 @@ export function createJob(values: unknown, requestSource: 'web' | 'agent' = 'web
     status: 'queued',
     decisionReason: pick?.reason || 'Handpicked by you.',
     paymentStatus: 'pending',
+    paymentMode: paymentMode(),
     paymentConfirmedAt: null,
     priceUsdc: style.priceUsdc,
     outputImageUrl: null,

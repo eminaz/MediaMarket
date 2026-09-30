@@ -13,6 +13,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       NEXT_TEST_BUILD: '1',
+      PAYMENT_MODE: process.env.TEST_PAY_SANDBOX === '1' ? 'pay-sandbox' : 'simulated',
       DEMO_PORT: '3102',
       SELLER_WORKER_TOKENS: '',
       SELLER_WORKER_TOKEN: '',

@@ -2,6 +2,7 @@ import { getStyles } from '@/lib/db';
 import { generationMode } from '@/lib/generation';
 import { CreateFlow } from '@/components/create-flow';
 import { executionMode, sellerHasWorker } from '@/lib/workers';
+import { paymentMode } from '@/lib/payment-mode';
 export const dynamic = 'force-dynamic';
 export default async function CreatePage({
   searchParams,
@@ -18,6 +19,7 @@ export default async function CreatePage({
       initialStyle={params.style}
       agentFirst={params.agent === 'true'}
       mode={execution === 'worker' ? 'worker' : generationMode()}
+      paymentMode={paymentMode()}
     />
   );
 }

@@ -7,6 +7,7 @@ import path from 'node:path';
 const directory = mkdtempSync(path.join(tmpdir(), 'tastemaker-agent-'));
 process.env.DATA_DIR = directory;
 process.env.EXECUTION_MODE = 'worker';
+process.env.PAYMENT_MODE = 'simulated';
 process.env.SELLER_WORKER_TOKENS = JSON.stringify({ 'studio.aure': 'test-seller-token-1234' });
 const { db, getJobs, getJob, getPrivateStyle, saveJob } = await import('../src/lib/db');
 const { POST: order } = await import('../src/app/api/agent/orders/route');
@@ -170,4 +171,27 @@ test('shared web order creation still requires checkout; keyword inference uses 
     inferTags('Unboldened luxuryless text', [getPrivateStyle('luxury-product-ad')!]),
     [],
   );
+});
+
+test('sandbox mode cannot be bypassed with simulated checkout and freezes payment mode per order', async () => {
+  process.env.PAYMENT_MODE = 'pay-sandbox';
+  try {
+    const count = getJobs().length;
+    assert.equal((await submit('sandbox-bypass-attempt')).status, 400);
+    assert.equal(getJobs().length, count);
+    const response = await submit('sandbox-pending-order', { ...input, payment: 'pay-sandbox' });
+    const body = await response.json();
+    assert.equal(body.payment.mode, 'pay-sandbox');
+    assert.equal(body.payment.status, 'pending');
+    assert.equal(body.payment.receipt, null);
+    assert.equal(body.paymentUrl, `/api/jobs/${body.jobId}/pay`);
+    assert.equal(getJob(body.jobId)?.paymentConfirmedAt, null);
+    process.env.PAYMENT_MODE = 'simulated';
+    const saved = await (
+      await status(new Request('http://localhost'), { params: Promise.resolve({ id: body.jobId }) })
+    ).json();
+    assert.equal(saved.payment.mode, 'pay-sandbox');
+  } finally {
+    process.env.PAYMENT_MODE = 'simulated';
+  }
 });

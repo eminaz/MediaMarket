@@ -18,6 +18,7 @@ const child = spawn(
     env: {
       ...process.env,
       GENERATION_MODE: 'mock',
+      PAYMENT_MODE: process.env.PAYMENT_MODE || 'pay-sandbox',
       EXECUTION_MODE: 'worker',
       SELLER_WORKER_TOKENS:
         process.env.SELLER_WORKER_TOKENS ||

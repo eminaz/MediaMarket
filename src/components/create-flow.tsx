@@ -34,11 +34,13 @@ export function CreateFlow({
   initialStyle,
   agentFirst,
   mode,
+  paymentMode,
 }: {
   styles: StyleListing[];
   initialStyle?: string;
   agentFirst: boolean;
   mode: string;
+  paymentMode: 'simulated' | 'pay-sandbox';
 }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -97,6 +99,10 @@ export function CreateFlow({
         });
         id = job.id;
         setJobId(id);
+      }
+      if (paymentMode === 'pay-sandbox') {
+        router.push(`/jobs/${id}`);
+        return;
       }
       await new Promise((resolve) => setTimeout(resolve, 1500));
       const paid = await api<GenerationJob>(`/api/jobs/${id}/pay`, {});
@@ -352,7 +358,9 @@ export function CreateFlow({
                 <div>
                   <strong>USDC, with a Solana state of mind.</strong>
                   <p>
-                    This is a simulated payment. No wallet, real tokens, or network fees.{' '}
+                    {paymentMode === 'pay-sandbox'
+                      ? 'Pay.sh sandbox checkout. Create your order, then pay from your local agent or terminal with test USDC. '
+                      : 'This is a simulated payment. No wallet, real tokens, or network fees. '}
                     {mode === 'worker'
                       ? 'Your seller’s machine will generate the image and send it back.'
                       : mode === 'mock'
@@ -360,7 +368,9 @@ export function CreateFlow({
                         : 'Image generation uses the configured live API.'}
                   </p>
                 </div>
-                <span className="demo-badge">DEMO</span>
+                <span className="demo-badge">
+                  {paymentMode === 'pay-sandbox' ? 'PAY SANDBOX' : 'DEMO'}
+                </span>
               </div>
               <button
                 className={`button button-full ${payment === 'confirmed' ? 'button-success' : 'button-dark'}`}
@@ -370,7 +380,7 @@ export function CreateFlow({
                 {payment === 'pending' ? (
                   <>
                     <LoaderCircle className="spin" size={18} />
-                    Payment pending…
+                    {paymentMode === 'pay-sandbox' ? 'Creating your order…' : 'Payment pending…'}
                   </>
                 ) : payment === 'confirmed' ? (
                   <>
@@ -379,7 +389,10 @@ export function CreateFlow({
                   </>
                 ) : (
                   <>
-                    Pay {selected.priceUsdc.toFixed(2)} USDC & create <ArrowRight size={17} />
+                    {paymentMode === 'pay-sandbox'
+                      ? `Continue to pay.sh · ${selected.priceUsdc.toFixed(2)} test USDC`
+                      : `Pay ${selected.priceUsdc.toFixed(2)} USDC & create`}{' '}
+                    <ArrowRight size={17} />
                   </>
                 )}
               </button>

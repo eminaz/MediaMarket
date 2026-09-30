@@ -20,11 +20,12 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
   const [job, setJob] = useState(initialJob);
   const [error, setError] = useState('');
   const [paying, setPaying] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const sandbox = job.paymentMode === 'pay-sandbox';
   const advancing = useRef(false);
   const done = job.status === 'delivered';
   useEffect(() => {
-    if (job.paymentStatus !== 'confirmed' || job.status === 'delivered' || job.status === 'failed')
-      return;
+    if (job.status === 'delivered' || job.status === 'failed') return;
     let stopped = false;
     async function tick() {
       try {
@@ -34,6 +35,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
         setError('');
         if (
           latest.executionMode !== 'worker' &&
+          latest.paymentStatus === 'confirmed' &&
           !advancing.current &&
           !['delivered', 'failed'].includes(latest.status)
         ) {
@@ -199,7 +201,9 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
               <p>
                 {job.error ||
                   (job.paymentStatus === 'pending'
-                    ? 'Confirm the simulated payment to start your creation.'
+                    ? sandbox
+                      ? 'Pay with your local pay.sh agent or terminal. Test USDC settles on the Pay sandbox before your seller starts.'
+                      : 'Confirm the simulated payment to start your creation.'
                     : 'Bringing your brief and your creator’s signature style together.')}
               </p>
               {job.status === 'failed' && (
@@ -208,7 +212,28 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                   Retry generation
                 </button>
               )}
-              {job.paymentStatus === 'pending' && (
+              {job.paymentStatus === 'pending' && sandbox && (
+                <div>
+                  <button
+                    className="button button-dark"
+                    onClick={async () => {
+                      const command = `pay --sandbox curl -X POST '${window.location.origin}/api/jobs/${job.id}/pay'`;
+                      try {
+                        await navigator.clipboard.writeText(command);
+                        setCopied(true);
+                      } catch {
+                        window.prompt('Copy and run on your laptop:', command);
+                      }
+                    }}
+                  >
+                    {copied ? 'Payment command copied' : 'Copy pay.sh payment command'}
+                  </button>
+                  <p className="mode-note">
+                    Run the command in your terminal. This page updates automatically after payment.
+                  </p>
+                </div>
+              )}
+              {job.paymentStatus === 'pending' && !sandbox && (
                 <button className="button button-dark" onClick={pay} disabled={paying}>
                   {paying && <LoaderCircle className="spin" size={16} />}Pay{' '}
                   {job.priceUsdc.toFixed(2)} demo USDC
@@ -216,7 +241,9 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
               )}
               <span className="generation-caption">
                 {job.paymentStatus === 'pending'
-                  ? 'SIMULATED PAYMENT · NO REAL FUNDS'
+                  ? sandbox
+                    ? 'PAY.SH SANDBOX · TEST USDC ONLY'
+                    : 'SIMULATED PAYMENT · NO REAL FUNDS'
                   : `ESTIMATED STYLE DELIVERY: ~${job.style.etaSeconds}s`}
               </span>
             </div>
@@ -264,7 +291,7 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
                   {job.paymentStatus === 'confirmed' ? (
                     <>
                       <Check size={12} />
-                      Demo paid
+                      {sandbox ? 'Sandbox paid' : 'Demo paid'}
                     </>
                   ) : (
                     'Payment pending'
@@ -287,7 +314,22 @@ export function JobView({ initialJob }: { initialJob: JobWithStyle }) {
             <label>{job.inputImageUrl ? 'THE BRIEF' : 'TEXT TO IMAGE'}</label>
             <p>{job.buyerBrief}</p>
             {job.requestSource === 'agent' && (
-              <p className="mode-note">Ordered by your agent · simulated USDC checkout</p>
+              <p className="mode-note">
+                Ordered by your agent ·{' '}
+                {sandbox ? 'pay.sh sandbox checkout' : 'simulated USDC checkout'}
+              </p>
+            )}
+            {job.paymentReceipt && (
+              <div className="mode-note" style={{ overflowWrap: 'anywhere' }}>
+                <strong>Pay.sh sandbox receipt</strong>
+                <p>{job.paymentReceipt.amountUsdc.toFixed(2)} test USDC · MPP · confirmed</p>
+                <p>
+                  Transaction: <code>{job.paymentReceipt.transaction}</code>
+                </p>
+                <p>
+                  Seller sandbox wallet: <code>{job.paymentReceipt.recipient}</code>
+                </p>
+              </div>
             )}
             <Tags tags={job.desiredTags} />
             {job.selectedByAgent && (

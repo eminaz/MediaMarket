@@ -38,6 +38,16 @@ export type GenerationJob = {
   requestSource?: 'web' | 'agent';
   decisionReason: string;
   paymentStatus: 'pending' | 'confirmed';
+  paymentMode?: 'simulated' | 'pay-sandbox';
+  paymentReceipt?: {
+    protocol: 'mpp';
+    network: 'pay-sandbox';
+    transaction: string;
+    payer: string | null;
+    recipient: string;
+    amountUsdc: number;
+    confirmedAt: string;
+  };
   paymentConfirmedAt: string | null;
   priceUsdc: number;
   outputImageUrl: string | null;

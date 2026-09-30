@@ -1,9 +1,10 @@
-import { parseArgs } from 'node:util';
+import { parseArgs, promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import path from 'node:path';
 import type { AgentOrderView } from '../src/lib/agent-orders';
+import { PAY_SANDBOX_RPC } from '../src/lib/payment-mode';
 
 // An HTTP-only reference client. No marketplace DB, browser, model, or seller credentials.
 try {
@@ -35,7 +36,8 @@ Defaults: budget 5 USDC, marketplace http://localhost:3001, wait up to 300 secon
 Optional: --budget 3 --tags luxury,minimal --brand AURA --style luxury-product-ad
           --marketplace http://BUYER_IP:3001 --output ./image.png --timeout 120
           --request-id unique-order-key --job existing-job-id
-Payments are simulated. Progress goes to stderr; the final result is JSON on stdout.
+Uses the marketplace payment mode: simulated, or real pay.sh sandbox test payments.
+Sandbox requires the pay CLI. Progress goes to stderr; the final result is JSON on stdout.
 No LLM is bundled: this client demonstrates the HTTP workflow for external agents.`);
     return;
   }
@@ -91,6 +93,9 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
       await request(`/api/agent/orders/${encodeURIComponent(values.job)}`)
     ).json()) as AgentOrderView;
   } else {
+    const manifest = await (await request('/api/agent')).json();
+    if (!['simulated', 'pay-sandbox'].includes(manifest.paymentMode))
+      throw new Error('Unsupported payment mode. This client never pays on mainnet.');
     const requestId = values['request-id'] || randomUUID();
     console.error(`Request ID: ${requestId} (reuse --request-id after a lost response)`);
     const discovery = await (await request(`/api/agent/styles?budget=${budget}`)).json();
@@ -104,7 +109,7 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
         body: JSON.stringify({
           prompt: positionals[0],
           budget,
-          payment: 'simulated',
+          payment: manifest.paymentMode,
           desiredTags: values.tags
             ?.split(',')
             .map((tag) => tag.trim())
@@ -116,10 +121,46 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
     ).json()) as AgentOrderView;
   }
   console.error(
-    `${job.style?.name} by @${job.style?.seller.handle} · ${job.payment.amountUsdc.toFixed(2)} simulated USDC`,
+    `${job.style?.name} by @${job.style?.seller.handle} · ${job.payment.amountUsdc.toFixed(2)} ${job.payment.mode} USDC`,
   );
   console.error(job.decisionReason);
   console.error(`View: ${resolveUrl(job.viewUrl)}`);
+  if (job.payment.status === 'pending') {
+    if (job.payment.mode !== 'pay-sandbox' || !job.paymentUrl)
+      throw new Error('Complete payment on the saved order before resuming.');
+    console.error('Paying with pay.sh --sandbox. Test USDC only; waiting for verified settlement…');
+    try {
+      await promisify(execFile)(
+        'pay',
+        [
+          '--sandbox',
+          'curl',
+          '--silent',
+          '--show-error',
+          '--fail-with-body',
+          '-X',
+          'POST',
+          resolveUrl(job.paymentUrl),
+        ],
+        {
+          timeout: Math.min(timeLeft(), 180_000),
+          maxBuffer: 2 * 1024 * 1024,
+          env: { ...process.env, PAY_RPC_URL: PAY_SANDBOX_RPC },
+        },
+      );
+    } catch (error) {
+      const details = error as Error & { code?: string; stderr?: string };
+      throw new Error(
+        `${details.code === 'ENOENT' ? 'Install pay first: brew install pay (or npm install -g @solana/pay).' : `Sandbox payment did not complete: ${details.stderr?.slice(-600) || details.message}`} Your order is saved. Check ${resolveUrl(job.viewUrl)} before resuming with --job ${job.jobId}.`,
+      );
+    }
+    job = (await (await request(job.statusUrl)).json()) as AgentOrderView;
+    if (job.payment.status !== 'confirmed')
+      throw new Error(
+        'Payment remains pending. Resume the saved order; generation has not been authorized.',
+      );
+    console.error(`Pay sandbox confirmed: ${job.payment.receipt?.transaction}`);
+  }
   let lastStatus = '';
   while (job.status !== 'delivered') {
     if (job.status !== lastStatus) {
@@ -160,7 +201,8 @@ No LLM is bundled: this client demonstrates the HTTP workflow for external agent
         viewUrl: resolveUrl(job.viewUrl),
         seller: job.style?.seller.handle,
         priceUsdc: job.payment.amountUsdc,
-        paymentMode: 'simulated',
+        paymentMode: job.payment.mode,
+        paymentReceipt: job.payment.receipt,
         generationMode: job.generationMode,
       },
       null,

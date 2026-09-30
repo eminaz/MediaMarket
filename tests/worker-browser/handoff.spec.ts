@@ -13,6 +13,7 @@ test('paid order waits for a separate worker, pauses, and delivers over HTTP', a
   request,
   context,
 }) => {
+  test.skip(process.env.TEST_PAY_SANDBOX === '1', 'Separate real sandbox payment test');
   test.setTimeout(process.env.TEST_LOCAL_GENERATOR === '1' ? 180_000 : 90_000);
   expect(
     (await request.post('/api/worker/claim', { data: { workerName: 'Unauthenticated' } })).status(),
